@@ -3,13 +3,13 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDVix3w8vLE6ihazDWVHpjYFWq5cu4AciY",
-  authDomain: "grifel-6822a.firebaseapp.com",
-  projectId: "grifel-6822a",
-  storageBucket: "grifel-6822a.firebasestorage.app",
-  messagingSenderId: "870210968125",
-  appId: "1:870210968125:web:ffcbca4e629b20794c6854",
-  measurementId: "G-FEL07Y92GW",
+  apiKey: "AIzaSyCiqY-Jw-EcVc9mOy43FuEKr6vtHGbxB6E",
+  authDomain: "khinevich-library.firebaseapp.com",
+  projectId: "khinevich-library",
+  storageBucket: "khinevich-library.firebasestorage.app",
+  messagingSenderId: "113049117141",
+  appId: "1:113049117141:web:8c618e1fb350559f925d5c",
+  measurementId: "G-TLZ8QJ741W",
 };
 
 const app = initializeApp(firebaseConfig);
