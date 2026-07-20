@@ -14,4 +14,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// В консоли Firebase база была создана с явным ID "default" (а не спец-именем "(default)"),
+// поэтому указываем его явно вторым аргументом — иначе SDK её не найдёт.
+export const db = getFirestore(app, "default");
