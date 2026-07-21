@@ -9,6 +9,7 @@ import { useAuth } from "./auth.jsx";
 import { useCol, setUserDoc } from "./useDB.js";
 
 import Dashboard from "./sections/Dashboard.jsx";
+import Students from "./sections/Students.jsx";
 import Library from "./sections/Library.jsx";
 import Useful from "./sections/Useful.jsx";
 import Homework from "./sections/Homework.jsx";
@@ -20,6 +21,7 @@ import Grades from "./sections/Grades.jsx";
 
 const NAV = [
   { id: "dash", label: "Главная", Icon: LayoutGrid, roles: ["tutor", "student", "parent"] },
+  { id: "students", label: "Ученики", Icon: Users, roles: ["tutor"] },
   { id: "lib", label: "Библиотека", Icon: BookOpen, roles: ["tutor", "student", "parent"] },
   { id: "useful", label: "Полезное", Icon: Youtube, roles: ["tutor", "student", "parent"] },
   { id: "homework", label: "Домашка", Icon: ClipboardList, roles: ["tutor", "student", "parent"] },
@@ -101,6 +103,7 @@ export default function App() {
         </header>
         <div className="app-content" style={{ padding: 28, flex: 1, overflow: "auto" }}>
           {current === "dash" && <Dashboard go={setTab} />}
+          {current === "students" && <Students />}
           {current === "lib" && <Library />}
           {current === "useful" && <Useful />}
           {current === "homework" && <Homework />}

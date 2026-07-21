@@ -9,7 +9,7 @@ export const T = {
   up: "#3f7a4d", down: "#a23b2d",
 };
 export const TAG_PALETTE = ["#c0453a","#d97a3f","#d9a622","#9a9a3f","#4b8f5c","#3f8f82","#3b8ea5","#3b6ea5","#5c66b0","#7a5aab","#a2529b","#c2568a","#8a5a3a","#6b6b6b","#7a2e3a"];
-export const SUBJECTS = ["Обществознание", "Математика", "Английский язык", "Поступление за границу"];
+export const SUBJECTS = ["Обществознание", "Математика", "Английский язык", "Поступление за границу", "Занятия с Марсельком"];
 export const serif = "'Georgia','Times New Roman',serif";
 export const sans = "'Inter','Segoe UI',system-ui,-apple-system,sans-serif";
 
