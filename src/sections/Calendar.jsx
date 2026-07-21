@@ -40,7 +40,11 @@ export default function CalendarPage() {
   const dayHw = dayOpen ? scoped(homework).filter((h) => h.due === dayOpen && h.status !== "Проверена") : [];
   const dayNotes = dayOpen ? scopedNotes.filter((n) => n.due === dayOpen && n.status !== "done") : [];
 
-  const feedUrl = `${window.location.origin}/.netlify/functions/calendar-ics?studentId=${sid || "all"}`;
+  const feedUrl = sid
+    ? `${window.location.origin}/.netlify/functions/calendar-ics?studentId=${sid}`
+    : role === "admin"
+      ? `${window.location.origin}/.netlify/functions/calendar-ics?studentId=all`
+      : `${window.location.origin}/.netlify/functions/calendar-ics?tutorId=${profile.uid}`;
   const copyLink = () => { navigator.clipboard.writeText(feedUrl); setCopied(true); setTimeout(() => setCopied(false), 1800); };
 
   return (
@@ -117,7 +121,7 @@ export default function CalendarPage() {
             <div style={{ flex: 1, padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: T.cardAlt, font: `13px ${sans}`, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{feedUrl}</div>
             <button style={btn} onClick={copyLink}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? "Скопировано" : "Копировать"}</button>
           </div>
-          <div style={{ font: `12px ${sans}`, color: T.faint }}>{sid ? "Эта ссылка покажет только ваши занятия." : "Эта ссылка (как у репетитора) покажет занятия всех учеников."}</div>
+          <div style={{ font: `12px ${sans}`, color: T.faint }}>{sid ? "Эта ссылка покажет только ваши занятия." : role === "admin" ? "Эта ссылка (администратор) покажет занятия всех учеников всех репетиторов." : "Эта ссылка покажет занятия только ваших учеников — данные других репетиторов не видны."}</div>
         </div>
       </Modal>
     </div>

@@ -1,5 +1,7 @@
 // Живой ICS-фид расписания занятий для подписки в Apple Calendar / Google Calendar.
-// URL: /.netlify/functions/calendar-ics?studentId=<uid>  (или ?studentId=all для репетитора)
+// URL: /.netlify/functions/calendar-ics?studentId=<uid>  — календарь конкретного ученика
+//      /.netlify/functions/calendar-ics?tutorId=<uid>    — календарь репетитора (только его ученики)
+//      /.netlify/functions/calendar-ics?studentId=all    — весь календарь платформы (только для админа)
 
 const PROJECT_ID = "khinevich-library";
 const API_KEY = "AIzaSyCiqY-Jw-EcVc9mOy43FuEKr6vtHGbxB6E";
@@ -28,12 +30,12 @@ function fromFV(v) {
   return null;
 }
 
-async function queryCollection(idToken, collectionId, studentId) {
+async function queryCollection(idToken, collectionId, filterField, filterValue) {
   const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents:runQuery`;
   const structuredQuery = {
     from: [{ collectionId }],
-    ...(studentId && studentId !== "all"
-      ? { where: { fieldFilter: { field: { fieldPath: "studentId" }, op: "EQUAL", value: { stringValue: studentId } } } }
+    ...(filterField && filterValue
+      ? { where: { fieldFilter: { field: { fieldPath: filterField }, op: "EQUAL", value: { stringValue: filterValue } } } }
       : {}),
   };
   const res = await fetch(url, {
@@ -86,13 +88,18 @@ function buildEvent({ uid, dateISO, timeHHMM, durationMin = 60, summary, descrip
 
 export const handler = async (event) => {
   try {
-    const studentId = (event.queryStringParameters && event.queryStringParameters.studentId) || "all";
+    const params = event.queryStringParameters || {};
+    const studentId = params.studentId || null;
+    const tutorId = params.tutorId || null;
+    const showNames = !studentId || studentId === "all"; // групповой календарь — показываем, чей это ученик/занятие
+    const filterField = studentId && studentId !== "all" ? "studentId" : tutorId ? "tutorId" : null;
+    const filterValue = studentId && studentId !== "all" ? studentId : tutorId || null;
     const idToken = await getTempIdToken();
 
     const [schedule, mocks, homework] = await Promise.all([
-      queryCollection(idToken, "schedule", studentId),
-      queryCollection(idToken, "mocks", studentId),
-      queryCollection(idToken, "homework", studentId),
+      queryCollection(idToken, "schedule", filterField, filterValue),
+      queryCollection(idToken, "mocks", filterField, filterValue),
+      queryCollection(idToken, "homework", filterField, filterValue),
     ]);
 
     const events = [];
@@ -103,7 +110,7 @@ export const handler = async (event) => {
         dateISO: l.date,
         timeHHMM: l.time,
         durationMin: 60,
-        summary: `Занятие: ${l.topic || "без темы"}${studentId === "all" ? " — " + (l.studentName || "") : ""}`,
+        summary: `Занятие: ${l.topic || "без темы"}${showNames ? " — " + (l.studentName || "") : ""}`,
         description: l.studentName ? `Ученик: ${l.studentName}` : "",
         alarmMinutesBefore: 30,
       }));
@@ -115,7 +122,7 @@ export const handler = async (event) => {
         dateISO: m.date,
         timeHHMM: null,
         durationMin: 90,
-        summary: `Пробник: ${m.title}${studentId === "all" ? " — " + (m.studentName || "") : ""}`,
+        summary: `Пробник: ${m.title}${showNames ? " — " + (m.studentName || "") : ""}`,
         alarmMinutesBefore: 30,
       }));
     });
@@ -126,7 +133,7 @@ export const handler = async (event) => {
         dateISO: h.due,
         timeHHMM: "23:00",
         durationMin: 30,
-        summary: `Дедлайн ДЗ: ${h.title}${studentId === "all" ? " — " + (h.studentName || "") : ""}`,
+        summary: `Дедлайн ДЗ: ${h.title}${showNames ? " — " + (h.studentName || "") : ""}`,
         alarmMinutesBefore: 30,
       }));
     });
