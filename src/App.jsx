@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   LayoutGrid, BookOpen, Youtube, ClipboardList, PenLine,
-  CalendarDays, Award, PencilLine, Menu, X,
+  CalendarDays, Calendar as CalendarIcon, Award, PencilLine, Menu, X, Bell,
   GraduationCap, User, Users, LogOut, ChevronRight,
 } from "lucide-react";
 import { T, serif, sans, Card, Avatar, btn, input, ROLE_LABEL, initials, SUBJECTS } from "./ui.jsx";
@@ -13,6 +13,8 @@ import Library from "./sections/Library.jsx";
 import Useful from "./sections/Useful.jsx";
 import Homework from "./sections/Homework.jsx";
 import Schedule from "./sections/Schedule.jsx";
+import Calendar from "./sections/Calendar.jsx";
+import Notifications from "./sections/Notifications.jsx";
 import Mocks from "./sections/Mocks.jsx";
 import Grades from "./sections/Grades.jsx";
 
@@ -22,6 +24,8 @@ const NAV = [
   { id: "useful", label: "Полезное", Icon: Youtube, roles: ["tutor", "student", "parent"] },
   { id: "homework", label: "Домашка", Icon: ClipboardList, roles: ["tutor", "student", "parent"] },
   { id: "sched", label: "Расписание", Icon: CalendarDays, roles: ["tutor", "student", "parent"] },
+  { id: "calendar", label: "Календарь", Icon: CalendarIcon, roles: ["tutor", "student", "parent"] },
+  { id: "notifications", label: "Уведомления", Icon: Bell, roles: ["tutor", "student", "parent"] },
   { id: "mocks", label: "Пробники", Icon: PencilLine, roles: ["tutor", "student", "parent"] },
   { id: "grades", label: "Журнал оценок", Icon: Award, roles: ["tutor", "student", "parent"] },
 ];
@@ -101,6 +105,8 @@ export default function App() {
           {current === "useful" && <Useful />}
           {current === "homework" && <Homework />}
           {current === "sched" && <Schedule />}
+          {current === "calendar" && <Calendar />}
+          {current === "notifications" && <Notifications />}
           {current === "mocks" && <Mocks />}
           {current === "grades" && <Grades />}
         </div>

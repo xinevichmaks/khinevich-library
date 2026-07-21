@@ -22,6 +22,8 @@ export function useCol(name) {
 
 export const addItem = (name, data) =>
   addDoc(collection(db, name), { ...data, createdAt: Date.now() });
+export const notify = (studentId, studentName, text, type) =>
+  addItem("notifications", { studentId, studentName, text, type, read: false });
 export const updateItem = (name, id, data) =>
   updateDoc(doc(db, name, id), data);
 export const removeItem = (name, id) => deleteDoc(doc(db, name, id));

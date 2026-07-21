@@ -83,6 +83,62 @@ export function DatePicker({ value, onChange, placeholder = "Выберите д
   );
 }
 
+/* ---------- полноразмерный календарь с несколькими категориями ---------- */
+export function MultiMonthCalendar({ categories, initialYear, initialMonth, big }) {
+  const today = new Date();
+  const [y, setY] = useState(initialYear ?? today.getFullYear());
+  const [m, setM] = useState(initialMonth ?? today.getMonth());
+  const shiftMonth = (delta) => {
+    let ny = y, nm = m + delta;
+    if (nm < 0) { nm = 11; ny--; } else if (nm > 11) { nm = 0; ny++; }
+    if (inRange(ny, nm)) { setY(ny); setM(nm); }
+  };
+  const cells = daysGrid(y, m);
+  const setsByCat = categories.map((c) => new Set((c.dates || []).filter(Boolean)));
+  const isoOf = (d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const isToday = (d) => today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
+  const canPrev = inRange(m === 0 ? y - 1 : y, m === 0 ? 11 : m - 1);
+  const canNext = inRange(m === 11 ? y + 1 : y, m === 11 ? 0 : m + 1);
+  const cellSize = big ? 64 : 44;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button onClick={() => shiftMonth(-1)} disabled={!canPrev} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: canPrev ? "pointer" : "default", color: canPrev ? T.soft : T.line }}><ChevronLeft size={18} /></button>
+          <div style={{ font: `700 18px ${sans}`, color: T.ink, textTransform: "capitalize", minWidth: 150, textAlign: "center" }}>{RU_MONTHS[m]} {y}</div>
+          <button onClick={() => shiftMonth(1)} disabled={!canNext} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: canNext ? "pointer" : "default", color: canNext ? T.soft : T.line }}><ChevronRight size={18} /></button>
+        </div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          {categories.map((c) => (
+            <div key={c.legend} style={{ display: "flex", alignItems: "center", gap: 6, font: `12px ${sans}`, color: T.faint }}>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: c.color, display: "inline-block" }} />{c.legend}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6, textAlign: "center" }}>
+        {RU_WD.map((w) => <div key={w} style={{ font: `600 11px ${sans}`, color: T.faint, paddingBottom: 4 }}>{w}</div>)}
+        {cells.map((d, i) => {
+          if (d == null) return <div key={i} />;
+          const iso = isoOf(d);
+          const marks = categories.map((c, ci) => setsByCat[ci].has(iso) ? c.color : null).filter(Boolean);
+          return (
+            <div key={i} style={{ position: "relative", height: cellSize, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, borderRadius: 10, background: isToday(d) ? T.accentSoft : T.cardAlt, border: `1px solid ${T.line}` }}>
+              <span style={{ font: `600 ${big ? 15 : 13}px ${sans}`, color: T.ink }}>{d}</span>
+              {marks.length > 0 && (
+                <div style={{ display: "flex", gap: 3 }}>
+                  {marks.map((c, k) => <span key={k} style={{ width: 6, height: 6, borderRadius: "50%", background: c, display: "inline-block" }} />)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- виджет-календарь месяца с навигацией (для главной) ---------- */
 export function MonthCalendar({ title, color, legend, markedDates = [] }) {
   const today = new Date();

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X, Search } from "lucide-react";
-import { Card, Modal, T, sans, btn, btnGhost, input, chip } from "../ui.jsx";
+import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X, Search, Settings2, Tag } from "lucide-react";
+import { Card, Modal, T, sans, btn, btnGhost, iconBtn, input, chip, TAG_PALETTE } from "../ui.jsx";
+import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
-import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
+import { useCol, addItem, updateItem, removeItem, notify } from "../useDB.js";
 
 // Статусы, которые репетитор может выбирать сам — видны всем ролям
 export const HW_STATUSES = ["Выдана", "Выполнена", "Проверена", "Требует доработки", "Не выполнена"];
@@ -18,7 +19,7 @@ export default function Homework() {
   const { items: users } = useCol("users");
   const { items: homework } = useCol("homework");
   const { items: materials } = useCol("materials");
-  const { items: tags } = useCol("tags");
+  const { items: tags } = useCol("hwTags");
   const students = users.filter((u) => u.role === "student");
   const [add, setAdd] = useState(false);
   const [targetIds, setTargetIds] = useState(new Set());
@@ -26,6 +27,8 @@ export default function Homework() {
   const [qs, setQs] = useState([]); // автопроверяемые вопросы для новой домашки
   const [q, setQ] = useState(""); // поиск
   const [filterTag, setFilterTag] = useState(null);
+  const [tagManager, setTagManager] = useState(false);
+  const [tagging, setTagging] = useState(null); // домашка, которой сейчас назначаем теги
 
   const [doingText, setDoingText] = useState(null); // домашка без вопросов — текстовая сдача
   const [submissionText, setSubmissionText] = useState("");
@@ -49,9 +52,10 @@ export default function Homework() {
   const save = async () => {
     if (!form.title || targetIds.size === 0) return;
     const cleanQs = qs.filter((q) => q.q.trim());
-    await Promise.all([...targetIds].map((studentId) => {
+    await Promise.all([...targetIds].map(async (studentId) => {
       const st = users.find((u) => u.id === studentId);
-      return addItem("homework", { ...form, studentId, studentName: st?.name || "", status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
+      await addItem("homework", { ...form, studentId, studentName: st?.name || "", status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
+      await notify(studentId, st?.name || "", `Новое домашнее задание: «${form.title}»`, "new_homework");
     }));
     setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]); setTargetIds(new Set());
   };
@@ -59,6 +63,7 @@ export default function Homework() {
   const submitText = async () => {
     if (!doingText) return;
     await updateItem("homework", doingText.id, { status: "Выполнена", submission: submissionText, submittedAt: Date.now() });
+    await notify(doingText.studentId, doingText.studentName, `${doingText.studentName} выполнил(а) задание «${doingText.title}»`, "homework_done");
     setDoingText(null); setSubmissionText("");
   };
 
@@ -70,12 +75,16 @@ export default function Homework() {
       status: "Проверена", answers: doingQuiz.questions.map((_, i) => answers[i] ?? -1),
       score, total: doingQuiz.questions.length, submission: submissionText, submittedAt: Date.now(),
     });
+    await notify(doingQuiz.studentId, doingQuiz.studentName, `${doingQuiz.studentName} выполнил(а) задание «${doingQuiz.title}» — ${score}/${doingQuiz.questions.length}`, "homework_done");
     setDoingQuiz(null); setAnswers({}); setSubmissionText("");
   };
 
   return (
     <div>
-      {role === "tutor" && <div style={{ marginBottom: 16 }}><button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Выдать домашку</button></div>}
+      {role === "tutor" && <div style={{ marginBottom: 16, display: "flex", gap: 10 }}>
+        <button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Выдать домашку</button>
+        <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
+      </div>}
 
       <div style={{ position: "relative", marginBottom: 12 }}>
         <Search size={17} color={T.faint} style={{ position: "absolute", left: 12, top: 11 }} />
@@ -119,11 +128,15 @@ export default function Homework() {
                 )}
                 {role === "tutor" && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{h.studentName}</div>}
                 {h.desc && <div style={{ font: `14px/1.5 ${sans}`, color: T.soft, marginTop: 6 }}>{h.desc}</div>}
-                <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>срок: {h.due || "—"}{mat ? ` · материал: ${mat.title}` : ""}</div>
+                <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>срок: {fmtDateRu(h.due) || "—"}{mat ? ` · материал: ${mat.title}` : ""}</div>
 
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                   {role === "tutor" ? (
-                    <select value={h.status} onChange={(e) => updateItem("homework", h.id, { status: e.target.value })}
+                    <select value={h.status} onChange={async (e) => {
+                      const val = e.target.value;
+                      await updateItem("homework", h.id, { status: val });
+                      if (val === "Проверена") await notify(h.studentId, h.studentName, `Домашнее задание проверено: «${h.title}»`, "homework_checked");
+                    }}
                       style={{ ...chip, background: STATUS_COLOR[h.status] || T.line, color: T.ink, border: "none", cursor: "pointer", padding: "5px 10px", font: `600 12px ${sans}` }}>
                       {HW_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -142,8 +155,9 @@ export default function Homework() {
 
                   {role === "tutor" && !hasQuiz && (h.status === "Выполнена" || h.status === "Требует доработки") && <>
                     <input style={{ ...input, width: 90, padding: "7px 10px" }} placeholder="Оценка" id={`g-${h.id}`} defaultValue={h.grade || ""} />
-                    <button style={btn} onClick={() => { const v = document.getElementById(`g-${h.id}`).value; updateItem("homework", h.id, { status: "Проверена", grade: v || "—" }); }}>Принять</button>
+                    <button style={btn} onClick={async () => { const v = document.getElementById(`g-${h.id}`).value; await updateItem("homework", h.id, { status: "Проверена", grade: v || "—" }); await notify(h.studentId, h.studentName, `Домашнее задание проверено: «${h.title}» — оценка ${v || "—"}`, "homework_checked"); }}>Принять</button>
                   </>}
+                  {role === "tutor" && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(h)}><Tag size={15} /></button>}
                   {role === "tutor" && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("homework", h.id)}><Trash2 size={15} /></button>}
                 </div>
               </div>
@@ -168,7 +182,7 @@ export default function Homework() {
           <input style={input} placeholder="Задание" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <textarea style={{ ...input, minHeight: 90, resize: "vertical" }} placeholder="Описание / что сделать" value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} />
           <div style={{ display: "flex", gap: 10 }}>
-            <input style={input} placeholder="Срок (напр. 25 июн)" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} />
+            <DatePicker value={form.due} onChange={(d) => setForm({ ...form, due: d })} placeholder="Срок сдачи" />
             <select style={input} value={form.materialId} onChange={(e) => setForm({ ...form, materialId: e.target.value })}>
               <option value="">— материал (необяз.) —</option>
               {materials.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
@@ -280,6 +294,74 @@ export default function Homework() {
           </div>
         )}
       </Modal>
+      {/* ---------- назначение тегов уже выданной домашке ---------- */}
+      <Modal open={!!tagging} onClose={() => setTagging(null)} title={tagging ? `Теги: ${tagging.title}` : ""}>
+        {tagging && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {tags.length === 0 && <div style={{ font: `13px ${sans}`, color: T.faint }}>Тегов ещё нет — создайте их через кнопку «Теги» в списке домашних заданий.</div>}
+              {tags.map((t) => {
+                const current = tagging.tagIds || [];
+                const on = current.includes(t.id);
+                const toggle = async () => {
+                  const next = on ? current.filter((x) => x !== t.id) : [...current, t.id];
+                  await updateItem("homework", tagging.id, { tagIds: next });
+                  setTagging({ ...tagging, tagIds: next });
+                };
+                return (
+                  <button key={t.id} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? t.color : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink }}>
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: t.color }} />{t.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ---------- менеджер тегов домашки (отдельно от тегов библиотеки) ---------- */}
+      <Modal open={tagManager} onClose={() => setTagManager(false)} title="Теги домашних заданий" wide>
+        <HwTagManager tags={tags} />
+      </Modal>
+    </div>
+  );
+}
+
+function HwTagManager({ tags }) {
+  const [name, setName] = useState("");
+  const [colorIdx, setColorIdx] = useState(0);
+  const addTag = async () => {
+    if (!name.trim()) return;
+    await addItem("hwTags", { name: name.trim(), color: TAG_PALETTE[colorIdx] });
+    setName(""); setColorIdx(0);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ font: `13px ${sans}`, color: T.faint }}>Эти теги отдельные от тегов библиотеки — используются только для домашних заданий (например, по темам или срокам).</div>
+      {tags.map((t) => (
+        <div key={t.id} style={{ padding: "10px 0", borderBottom: `1px solid ${T.line}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <span style={{ width: 16, height: 16, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
+            <input style={input} defaultValue={t.name} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== t.name) updateItem("hwTags", t.id, { name: e.target.value.trim() }); }} />
+            <button onClick={() => removeItem("hwTags", t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: T.faint }}><Trash2 size={15} /></button>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {TAG_PALETTE.map((c) => (
+              <button key={c} onClick={() => updateItem("hwTags", t.id, { color: c })} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: `2px solid ${t.color === c ? T.ink : "transparent"}`, cursor: "pointer" }} />
+            ))}
+          </div>
+        </div>
+      ))}
+      <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 14 }}>
+        <div style={{ font: `600 13px ${sans}`, color: T.ink, marginBottom: 8 }}>Новый тег</div>
+        <input style={{ ...input, marginBottom: 10 }} placeholder="Название тега" value={name} onChange={(e) => setName(e.target.value)} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          {TAG_PALETTE.map((c, i) => (
+            <button key={c} onClick={() => setColorIdx(i)} style={{ width: 26, height: 26, borderRadius: "50%", background: c, border: `2px solid ${colorIdx === i ? T.ink : "transparent"}`, cursor: "pointer" }} />
+          ))}
+        </div>
+        <button style={{ ...btn, padding: "8px 13px" }} onClick={addTag}><Plus size={15} />Добавить тег</button>
+      </div>
     </div>
   );
 }

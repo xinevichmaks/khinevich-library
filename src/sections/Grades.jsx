@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Plus, Award, Trash2 } from "lucide-react";
 import { Card, Modal, T, serif, sans, btn, btnGhost, input, Avatar, initials } from "../ui.jsx";
+import { CandleChart } from "../chart.jsx";
 import { useAuth } from "../auth.jsx";
-import { useCol, addItem, removeItem } from "../useDB.js";
+import { useCol, addItem, removeItem, notify } from "../useDB.js";
 import { averagePct } from "../grading.js";
 
 // Собирает записи журнала (домашка со статусом «Проверена» + пробники «Пройден» + оценки вручную)
@@ -40,6 +41,7 @@ export default function Grades() {
     if (!form.title || !form.value) return;
     const st = users.find((u) => u.id === add);
     await addItem("grades", { studentId: add, studentName: st?.name || "", ...form, when: new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) });
+    await notify(add, st?.name || "", `Новая оценка: ${form.value}${form.max ? "/" + form.max : ""} — «${form.title}»`, "new_grade");
     setAdd(null); setForm({ subject: "", title: "", value: "", max: "", comment: "" });
   };
 
@@ -59,6 +61,12 @@ export default function Grades() {
               <Award size={17} color={T.accent} />
               {role === "tutor" && <button style={{ ...btn, padding: "8px 13px" }} onClick={() => setAdd(st.id)}><Plus size={15} />Оценка</button>}
             </div>
+
+            {rows.length > 0 && (
+              <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
+                <CandleChart rows={rows} />
+              </div>
+            )}
 
             {rows.length === 0 ? (
               <div style={{ font: `14px ${sans}`, color: T.faint, padding: "18px" }}>Пока нет оценок.</div>
