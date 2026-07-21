@@ -34,6 +34,7 @@ export default function Homework() {
   const [tagging, setTagging] = useState(null); // домашка, которой сейчас назначаем теги
   const [reassigning, setReassigning] = useState(null); // домашка, которую переназначаем
   const [reassignIds, setReassignIds] = useState(new Set());
+  const [reassignDue, setReassignDue] = useState("");
 
   const [doingText, setDoingText] = useState(null); // домашка без вопросов — текстовая сдача
   const [submissionText, setSubmissionText] = useState("");
@@ -87,6 +88,7 @@ export default function Homework() {
     });
     await updateItem("homework", doingQuiz.id, {
       status: hasGraph ? "Требует проверки" : "Проверена",
+      ...(hasGraph ? {} : { due: null }),
       answers: doingQuiz.questions.map((_, i) => answers[i] ?? (doingQuiz.questions[i].type === "graph" ? "" : -1)),
       score, total, submission: submissionText, submittedAt: Date.now(),
     });
@@ -104,7 +106,7 @@ export default function Homework() {
     });
     const mcScore = grading.score || 0, mcTotal = grading.total || 0;
     await updateItem("homework", grading.id, {
-      status: "Проверена", manualScores: gradePoints,
+      status: "Проверена", manualScores: gradePoints, due: null,
       score: mcScore + manualScore, total: mcTotal + manualTotal,
     });
     await notify(grading.studentId, grading.studentName, `Домашнее задание проверено: «${grading.title}» — ${mcScore + manualScore}/${mcTotal + manualTotal}`, "homework_checked");
@@ -113,19 +115,19 @@ export default function Homework() {
 
   const doReassign = async () => {
     if (!reassigning || reassignIds.size === 0) return;
-    const { id, createdAt, studentId, studentName, status, score, total, answers, submission, submittedAt, grade, ...rest } = reassigning;
+    const { id, createdAt, studentId, studentName, status, score, total, answers, submission, submittedAt, grade, manualScores, due, ...rest } = reassigning;
     await Promise.all([...reassignIds].map(async (sid2) => {
       const st = users.find((u) => u.id === sid2);
-      await addItem("homework", { ...rest, studentId: sid2, studentName: st?.name || "", tutorId: profile.uid, status: "Выдана" });
+      await addItem("homework", { ...rest, due: reassignDue || null, studentId: sid2, studentName: st?.name || "", tutorId: profile.uid, status: "Выдана" });
       await notify(sid2, st?.name || "", `Новое домашнее задание: «${reassigning.title}»`, "new_homework");
     }));
-    setReassigning(null); setReassignIds(new Set());
+    setReassigning(null); setReassignIds(new Set()); setReassignDue("");
   };
   const toggleReassign = (id) => setReassignIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   return (
     <div>
-      {role === "tutor" && <div style={{ marginBottom: 16, display: "flex", gap: 10 }}>
+      {isStaff && <div style={{ marginBottom: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Выдать домашку</button>
         <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
       </div>}
@@ -146,8 +148,8 @@ export default function Homework() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {list.map((h) => {
+      {(() => {
+        const renderCard = (h) => {
           const mat = materials.find((m) => m.id === h.materialId);
           const Icon = STATUS_ICON[h.status] || Circle;
           const hasQuiz = h.questions && h.questions.length > 0;
@@ -170,15 +172,15 @@ export default function Homework() {
                     ))}
                   </div>
                 )}
-                {role === "tutor" && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{h.studentName}</div>}
+                {isStaff && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{h.studentName}</div>}
                 {h.desc && <div style={{ font: `14px/1.5 ${sans}`, color: T.soft, marginTop: 6 }}>{h.desc}</div>}
-                <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>срок: {fmtDateRu(h.due) || "—"}{mat ? ` · материал: ${mat.title}` : ""}</div>
+                <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>{h.due ? `срок: ${fmtDateRu(h.due)}` : "без срока (архив)"}{mat ? ` · материал: ${mat.title}` : ""}</div>
 
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-                  {role === "tutor" ? (
+                  {isStaff ? (
                     <select value={h.status} onChange={async (e) => {
                       const val = e.target.value;
-                      await updateItem("homework", h.id, { status: val });
+                      await updateItem("homework", h.id, { status: val, ...(val === "Проверена" ? { due: null } : {}) });
                       if (val === "Проверена") await notify(h.studentId, h.studentName, `Домашнее задание проверено: «${h.title}»`, "homework_checked");
                     }}
                       style={{ ...chip, background: STATUS_COLOR[h.status] || T.line, color: T.ink, border: "none", cursor: "pointer", padding: "5px 10px", font: `600 12px ${sans}` }}>
@@ -188,30 +190,63 @@ export default function Homework() {
                     <span style={{ ...chip, background: STATUS_COLOR[h.status], color: T.ink }}>{h.status}</span>
                   )}
 
-
                   {role === "student" && hasQuiz && (h.status === "Выдана" || h.status === "Требует доработки") &&
                     <button style={btn} onClick={() => { setDoingQuiz(h); setAnswers({}); setSubmissionText(h.submission || ""); }}>{h.status === "Требует доработки" ? "Пройти заново" : "Пройти задание"}</button>}
                   {role === "student" && !hasQuiz && h.status === "Выдана" && <button style={btn} onClick={() => { setDoingText(h); setSubmissionText(""); }}>Отметить выполненной</button>}
                   {role === "student" && !hasQuiz && h.status === "Требует доработки" && <button style={btn} onClick={() => { setDoingText(h); setSubmissionText(h.submission || ""); }}>Сдать заново</button>}
 
                   {alreadyAnswered && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setReview(h)}><ListChecks size={15} />Разбор ответов</button>}
-                  {role === "tutor" && h.submission && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setViewing(h)}><Eye size={15} />Как выполнил</button>}
+                  {isStaff && h.submission && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setViewing(h)}><Eye size={15} />Как выполнил</button>}
 
-                  {role === "tutor" && !hasQuiz && (h.status === "Выполнена" || h.status === "Требует доработки") && <>
+                  {isStaff && !hasQuiz && (h.status === "Выполнена" || h.status === "Требует доработки") && <>
                     <input style={{ ...input, width: 90, padding: "7px 10px" }} placeholder="Оценка" id={`g-${h.id}`} defaultValue={h.grade || ""} />
-                    <button style={btn} onClick={async () => { const v = document.getElementById(`g-${h.id}`).value; await updateItem("homework", h.id, { status: "Проверена", grade: v || "—" }); await notify(h.studentId, h.studentName, `Домашнее задание проверено: «${h.title}» — оценка ${v || "—"}`, "homework_checked"); }}>Принять</button>
+                    <button style={btn} onClick={async () => { const v = document.getElementById(`g-${h.id}`).value; await updateItem("homework", h.id, { status: "Проверена", grade: v || "—", due: null }); await notify(h.studentId, h.studentName, `Домашнее задание проверено: «${h.title}» — оценка ${v || "—"}`, "homework_checked"); }}>Принять</button>
                   </>}
-                  {role === "tutor" && h.status === "Требует проверки" && <button style={btn} onClick={() => { setGrading(h); setGradePoints(h.manualScores || {}); }}>✍️ Проверить вручную</button>}
-                  {role === "tutor" && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(h)}><Tag size={15} /></button>}
-                  {role === "tutor" && <button title="Задать ещё раз или другим ученикам" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => { setReassigning(h); setReassignIds(new Set([h.studentId])); }}><Repeat size={15} />Задать ещё</button>}
-                  {role === "tutor" && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("homework", h.id)}><Trash2 size={15} /></button>}
+                  {isStaff && h.status === "Требует проверки" && <button style={btn} onClick={() => { setGrading(h); setGradePoints(h.manualScores || {}); }}>✍️ Проверить вручную</button>}
+                  {isStaff && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(h)}><Tag size={15} /></button>}
+                  {isStaff && <button title="Задать ещё раз или другим ученикам" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => { setReassigning(h); setReassignIds(new Set([h.studentId])); setReassignDue(""); }}><Repeat size={15} />Задать ещё</button>}
+                  {isStaff && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("homework", h.id)}><Trash2 size={15} /></button>}
                 </div>
               </div>
             </Card>
           );
-        })}
-        {list.length === 0 && <div style={{ color: T.faint, font: `14px ${sans}`, padding: 24 }}>Домашних заданий пока нет.</div>}
-      </div>
+        };
+
+        const needsReview = list.filter((h) => h.status === "Требует проверки");
+        const archived = list.filter((h) => h.status === "Проверена");
+        const active = list.filter((h) => h.status !== "Требует проверки" && h.status !== "Проверена");
+
+        const Section = ({ title, items, empty }) => items.length === 0 && !empty ? null : (
+          <div style={{ marginBottom: 26 }}>
+            <div style={{ font: `600 13px ${sans}`, color: T.faint, textTransform: "uppercase", letterSpacing: ".03em", marginBottom: 10 }}>{title} {items.length > 0 && `(${items.length})`}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {items.length > 0 ? items.map(renderCard) : <div style={{ color: T.faint, font: `14px ${sans}`, padding: 16 }}>Пусто.</div>}
+            </div>
+          </div>
+        );
+
+        if (!isStaff) {
+          // ученик/родитель: активные сверху, архив — внизу отдельным блоком
+          const activeStudent = list.filter((h) => h.status !== "Проверена");
+          const archivedStudent = list.filter((h) => h.status === "Проверена");
+          return (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: activeStudent.length ? 0 : 20 }}>
+                {activeStudent.length > 0 ? activeStudent.map(renderCard) : <div style={{ color: T.faint, font: `14px ${sans}`, padding: 24 }}>Активных домашних заданий нет.</div>}
+              </div>
+              {archivedStudent.length > 0 && <Section title="Архив (решённые)" items={archivedStudent} empty />}
+            </>
+          );
+        }
+
+        return (
+          <>
+            <Section title="Требуют проверки" items={needsReview} empty={list.length === 0} />
+            <Section title="Активные" items={active} empty={list.length === 0} />
+            <Section title="Архив (решённые)" items={archived} empty={list.length === 0} />
+          </>
+        );
+      })()}
 
       {/* ---------- создание домашки ---------- */}
       <Modal open={add} onClose={() => setAdd(false)} title="Новая домашка" wide>
@@ -399,6 +434,10 @@ export default function Homework() {
                   </button>
                 );
               })}
+            </div>
+            <div>
+              <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 6 }}>Новый срок сдачи</div>
+              <DatePicker value={reassignDue} onChange={setReassignDue} />
             </div>
             <button style={btn} onClick={doReassign}>Назначить выбранным ({reassignIds.size})</button>
           </div>

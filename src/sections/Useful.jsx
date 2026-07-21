@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { Plus, Play } from "lucide-react";
+import { Plus, Play, Check } from "lucide-react";
 import { Card, Modal, Avatar, T, sans, btn, input, chip } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
-import { useCol, addItem } from "../useDB.js";
+import { useCol, addItem, updateItem } from "../useDB.js";
 
 const parseId = (u) => {
   const m = u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);
@@ -39,6 +39,11 @@ export default function Useful() {
   }, [role, profile, users, isStaff]);
 
   const myCourseOptions = subjectsList.filter((s) => s.tutorId === profile?.uid);
+  const watchedIds = users.find((u) => u.id === profile.uid)?.watchedVideoIds || [];
+  const toggleWatched = (vid) => {
+    const next = watchedIds.includes(vid) ? watchedIds.filter((x) => x !== vid) : [...watchedIds, vid];
+    updateItem("users", profile.uid, { watchedVideoIds: next });
+  };
 
   const visible = useful
     .filter((v) => (role === "admin" ? true : v.tutorId === myTutorId))
@@ -55,8 +60,7 @@ export default function Useful() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ font: `14px ${sans}`, color: T.soft }}>Подборка видео — доступна вам, ученику и родителю</div>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         {isStaff && <button style={btn} onClick={() => setAdd(true)}><Plus size={17} />Добавить ссылку</button>}
       </div>
 
@@ -71,23 +75,30 @@ export default function Useful() {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: "20px 16px" }}>
-        {list.map((v) => (
-          <div key={v.id} onClick={() => setOpen(v)} style={{ cursor: "pointer" }}>
-            <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", aspectRatio: "16/9", background: "#000" }}>
+        {list.map((v) => {
+          const watched = watchedIds.includes(v.id);
+          return (
+          <div key={v.id} style={{ opacity: watched ? 0.6 : 1 }}>
+            <div onClick={() => setOpen(v)} style={{ position: "relative", borderRadius: 12, overflow: "hidden", aspectRatio: "16/9", background: "#000", cursor: "pointer" }}>
               <img alt="" src={`https://i.ytimg.com/vi/${v.vid}/hqdefault.jpg`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", background: "rgba(0,0,0,.12)" }}>
                 <div style={{ width: 46, height: 46, borderRadius: "50%", background: "rgba(0,0,0,.6)", display: "grid", placeItems: "center" }}><Play size={20} color="#fff" fill="#fff" /></div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <Avatar text="K" size={34} bg={T.ink} />
-              <div style={{ minWidth: 0 }}>
-                <div style={{ font: `600 14px/1.35 ${sans}`, color: T.ink, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{v.title}</div>
-                <div style={{ font: `13px ${sans}`, color: T.faint, marginTop: 3 }}>{v.channel}{v.subject ? ` · ${v.subject}` : ""}</div>
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleWatched(v.id); }}
+                title={watched ? "Отметить непросмотренным" : "Отметить просмотренным"}
+                style={{ flexShrink: 0, width: 34, height: 34, borderRadius: "50%", border: `1.5px solid ${watched ? T.up : T.line}`, background: watched ? T.up : "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}
+              ><Check size={16} color={watched ? "#fff" : T.faint} /></button>
+              <div onClick={() => setOpen(v)} style={{ minWidth: 0, cursor: "pointer" }}>
+                <div style={{ font: `600 14px/1.35 ${sans}`, color: T.ink, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textDecoration: watched ? "line-through" : "none" }}>{v.title}</div>
+                <div style={{ font: `13px ${sans}`, color: T.faint, marginTop: 3 }}>{v.channel}{v.subject ? ` · ${v.subject}` : ""}{watched ? " · просмотрено" : ""}</div>
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {list.length === 0 && <div style={{ color: T.faint, font: `14px ${sans}`, padding: 24 }}>Пока пусто. {isStaff ? "Добавьте первое видео." : "Ваш репетитор ещё не добавил видео."}</div>}
       </div>
 

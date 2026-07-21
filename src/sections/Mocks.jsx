@@ -136,7 +136,7 @@ export default function Mocks() {
 
   return (
     <div>
-      {role === "tutor" && <div style={{ marginBottom: 16, display: "flex", gap: 10 }}>
+      {role === "tutor" && <div style={{ marginBottom: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Добавить пробник</button>
         <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
       </div>}
