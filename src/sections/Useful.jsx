@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Play } from "lucide-react";
-import { Card, Modal, Avatar, T, sans, btn, input, chip, SUBJECTS } from "../ui.jsx";
+import { Card, Modal, Avatar, T, sans, btn, input, chip } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, addItem } from "../useDB.js";
 
@@ -11,41 +11,53 @@ const parseId = (u) => {
 
 export default function Useful() {
   const { role, profile } = useAuth();
+  const isStaff = role === "tutor" || role === "admin";
   const { items: useful } = useCol("useful");
   const { items: users } = useCol("users");
+  const { items: subjectsList } = useCol("subjects");
   const [open, setOpen] = useState(null);
   const [add, setAdd] = useState(false);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState(SUBJECTS[0]);
+  const [subject, setSubject] = useState("");
   const [filterSubject, setFilterSubject] = useState(null);
+
+  const myTutorId = useMemo(() => {
+    if (isStaff) return profile.uid;
+    const sid = role === "student" ? profile.uid : profile.childId;
+    return users.find((u) => u.id === sid)?.tutorId || null;
+  }, [role, profile, users, isStaff]);
 
   // Доступ к предметам — как в библиотеке: по умолчанию только основной предмет ученика,
   // если репетитор не открыл доступ к другим через раздел «Ученики».
   const mySubjects = useMemo(() => {
-    if (role === "tutor") return null;
+    if (isStaff) return null;
     const sid = role === "student" ? profile.uid : profile.childId;
     const st = users.find((u) => u.id === sid);
     if (!st) return [];
     return st.subjectAccess && st.subjectAccess.length ? st.subjectAccess : [st.subject].filter(Boolean);
-  }, [role, profile, users]);
+  }, [role, profile, users, isStaff]);
 
-  const visible = useful.filter((v) => mySubjects === null || mySubjects.includes(v.subject || "Обществознание"));
-  const list = filterSubject ? visible.filter((v) => (v.subject || "Обществознание") === filterSubject) : visible;
-  const subjectsPresent = [...new Set(visible.map((v) => v.subject || "Обществознание"))];
+  const myCourseOptions = subjectsList.filter((s) => s.tutorId === profile?.uid);
+
+  const visible = useful
+    .filter((v) => (role === "admin" ? true : v.tutorId === myTutorId))
+    .filter((v) => mySubjects === null || mySubjects.includes(v.subject));
+  const list = filterSubject ? visible.filter((v) => v.subject === filterSubject) : visible;
+  const subjectsPresent = [...new Set(visible.map((v) => v.subject).filter(Boolean))];
 
   const save = async () => {
     const vid = parseId(url);
     if (!vid || !title) return;
-    await addItem("useful", { vid, title, channel: "Khinevich Library", subject });
-    setAdd(false); setUrl(""); setTitle(""); setSubject(SUBJECTS[0]);
+    await addItem("useful", { vid, title, channel: profile.name, subject, tutorId: profile.uid });
+    setAdd(false); setUrl(""); setTitle(""); setSubject("");
   };
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ font: `14px ${sans}`, color: T.soft }}>Подборка видео — доступна вам, ученику и родителю</div>
-        {role === "tutor" && <button style={btn} onClick={() => setAdd(true)}><Plus size={17} />Добавить ссылку</button>}
+        {isStaff && <button style={btn} onClick={() => setAdd(true)}><Plus size={17} />Добавить ссылку</button>}
       </div>
 
       {subjectsPresent.length > 1 && (
@@ -59,7 +71,7 @@ export default function Useful() {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: "20px 16px" }}>
-        {useful.map((v) => (
+        {list.map((v) => (
           <div key={v.id} onClick={() => setOpen(v)} style={{ cursor: "pointer" }}>
             <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", aspectRatio: "16/9", background: "#000" }}>
               <img alt="" src={`https://i.ytimg.com/vi/${v.vid}/hqdefault.jpg`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -71,12 +83,12 @@ export default function Useful() {
               <Avatar text="K" size={34} bg={T.ink} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ font: `600 14px/1.35 ${sans}`, color: T.ink, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{v.title}</div>
-                <div style={{ font: `13px ${sans}`, color: T.faint, marginTop: 3 }}>{v.channel} · {v.subject || "Обществознание"}</div>
+                <div style={{ font: `13px ${sans}`, color: T.faint, marginTop: 3 }}>{v.channel}{v.subject ? ` · ${v.subject}` : ""}</div>
               </div>
             </div>
           </div>
         ))}
-        {useful.length === 0 && <div style={{ color: T.faint, font: `14px ${sans}`, padding: 24 }}>Пока пусто. {role === "tutor" ? "Добавьте первое видео." : "Учитель ещё не добавил видео."}</div>}
+        {list.length === 0 && <div style={{ color: T.faint, font: `14px ${sans}`, padding: 24 }}>Пока пусто. {isStaff ? "Добавьте первое видео." : "Ваш репетитор ещё не добавил видео."}</div>}
       </div>
 
       <Modal open={!!open} onClose={() => setOpen(null)} title={open?.title} wide>
@@ -90,7 +102,8 @@ export default function Useful() {
           <input style={input} placeholder="Ссылка на YouTube" value={url} onChange={(e) => setUrl(e.target.value)} />
           <input style={input} placeholder="Заголовок" value={title} onChange={(e) => setTitle(e.target.value)} />
           <select style={input} value={subject} onChange={(e) => setSubject(e.target.value)}>
-            {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            <option value="">— без предмета —</option>
+            {myCourseOptions.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
           <button style={btn} onClick={save}>Добавить</button>
         </div>
