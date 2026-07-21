@@ -18,7 +18,7 @@ export function fmtDateRu(iso) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return iso; // на случай старых строк вида "23 июн"
-  return `${d} ${RU_MONTHS_SHORT[m - 1]}`;
+  return `${d} ${RU_MONTHS[m - 1]} ${y}`;
 }
 function inRange(y, m) {
   if (y < MIN_YM.y || (y === MIN_YM.y && m < MIN_YM.m)) return false;
@@ -83,6 +83,19 @@ export function DatePicker({ value, onChange, placeholder = "Выберите д
   );
 }
 
+// Единая «обводка» дня — кольцо; при нескольких событиях делится на равные дуги по числу категорий
+function EventRing({ size, colors, thickness = 2.5 }) {
+  if (!colors || colors.length === 0) return null;
+  const common = { position: "absolute", top: "50%", left: "50%", width: size, height: size, transform: "translate(-50%,-50%)", borderRadius: "50%", pointerEvents: "none" };
+  if (colors.length === 1) {
+    return <span style={{ ...common, border: `${thickness}px solid ${colors[0]}` }} />;
+  }
+  const seg = 100 / colors.length;
+  const stops = colors.map((c, i) => `${c} ${i * seg}% ${(i + 1) * seg}%`).join(", ");
+  const maskImg = `radial-gradient(farthest-side, transparent calc(100% - ${thickness}px), #000 calc(100% - ${thickness}px))`;
+  return <span style={{ ...common, background: `conic-gradient(${stops})`, WebkitMask: maskImg, mask: maskImg }} />;
+}
+
 /* ---------- полноразмерный календарь с несколькими категориями ---------- */
 export function MultiMonthCalendar({ categories, initialYear, initialMonth, big }) {
   const today = new Date();
@@ -124,13 +137,9 @@ export function MultiMonthCalendar({ categories, initialYear, initialMonth, big 
           const iso = isoOf(d);
           const marks = categories.map((c, ci) => setsByCat[ci].has(iso) ? c.color : null).filter(Boolean);
           return (
-            <div key={i} style={{ position: "relative", height: cellSize, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, borderRadius: 10, background: isToday(d) ? T.accentSoft : T.cardAlt, border: `1px solid ${T.line}` }}>
-              <span style={{ font: `600 ${big ? 15 : 13}px ${sans}`, color: T.ink }}>{d}</span>
-              {marks.length > 0 && (
-                <div style={{ display: "flex", gap: 3 }}>
-                  {marks.map((c, k) => <span key={k} style={{ width: 6, height: 6, borderRadius: "50%", background: c, display: "inline-block" }} />)}
-                </div>
-              )}
+            <div key={i} style={{ position: "relative", height: cellSize, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: isToday(d) ? T.accentSoft : T.cardAlt, border: `1px solid ${T.line}` }}>
+              <EventRing size={Math.round(cellSize * 0.72)} colors={marks} thickness={big ? 3 : 2.5} />
+              <span style={{ position: "relative", font: `600 ${big ? 15 : 13}px ${sans}`, color: T.ink }}>{d}</span>
             </div>
           );
         })}
@@ -175,7 +184,7 @@ export function MonthCalendar({ title, color, legend, markedDates = [] }) {
           if (d == null) return <div key={i} />;
           return (
             <div key={i} style={{ position: "relative", aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center", font: `13px ${sans}`, color: T.ink, borderRadius: 8, background: isToday(d) ? T.accentSoft : "transparent" }}>
-              {isMarked(d) && <span style={{ position: "absolute", inset: 2, borderRadius: 8, border: `2px solid ${color}` }} />}
+              {isMarked(d) && <EventRing size="86%" colors={[color]} thickness={2.5} />}
               <span style={{ position: "relative" }}>{d}</span>
             </div>
           );
