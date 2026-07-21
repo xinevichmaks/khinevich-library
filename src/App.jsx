@@ -57,12 +57,18 @@ export default function App() {
   const { user, profile, role, loading, logout } = useAuth();
   const [tab, setTab] = useState("dash");
   const [navOpen, setNavOpen] = useState(false);
+  const { items: allUsers } = useCol("users");
 
   if (loading) return <Splash text="Загрузка…" />;
   if (!user || !profile) return <><style>{globalCss}</style><Auth /></>;
   if (role === "parent" && !profile.childId) return <><style>{globalCss}</style><LinkChild /></>;
 
-  const nav = NAV.filter((n) => n.roles.includes(role));
+  const NO_EXTRAS_SUBJECTS = ["Менторство", "Занятия с Марселькой"];
+  const mySubject = role === "student" ? profile.subject : role === "parent" ? allUsers.find((u) => u.id === profile.childId)?.subject : null;
+  const hideExtras = role !== "tutor" && NO_EXTRAS_SUBJECTS.includes(mySubject);
+  const EXTRA_IDS = ["grades", "mocks", "useful"];
+
+  const nav = NAV.filter((n) => n.roles.includes(role) && !(hideExtras && EXTRA_IDS.includes(n.id)));
   const current = nav.find((n) => n.id === tab) ? tab : "dash";
   const goTab = (id) => { setTab(id); setNavOpen(false); };
 

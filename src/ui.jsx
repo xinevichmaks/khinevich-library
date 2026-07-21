@@ -19,8 +19,8 @@ export const btnGhost = { ...btn, background: T.card, color: T.ink, border: `1px
 export const input = { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: "#fff", font: `14px ${sans}`, color: T.ink, outline: "none" };
 export const chip = { font: `600 11px ${sans}`, padding: "3px 9px", borderRadius: 20, background: T.accentSoft, color: T.accentDk, whiteSpace: "nowrap" };
 
-export function Card({ children, style }) {
-  return <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 13, ...style }}>{children}</div>;
+export function Card({ children, style, ...rest }) {
+  return <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 13, ...style }} {...rest}>{children}</div>;
 }
 export function Avatar({ text, size = 36, bg = T.accent, color = "#fff" }) {
   return <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color, display: "grid", placeItems: "center", font: `600 ${size * 0.38}px ${sans}`, flexShrink: 0 }}>{text}</div>;

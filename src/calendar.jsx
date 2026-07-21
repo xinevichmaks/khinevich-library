@@ -97,7 +97,7 @@ function EventRing({ size, colors, thickness = 2.5 }) {
 }
 
 /* ---------- полноразмерный календарь с несколькими категориями ---------- */
-export function MultiMonthCalendar({ categories, initialYear, initialMonth, big }) {
+export function MultiMonthCalendar({ categories, initialYear, initialMonth, big, onDayClick }) {
   const today = new Date();
   const [y, setY] = useState(initialYear ?? today.getFullYear());
   const [m, setM] = useState(initialMonth ?? today.getMonth());
@@ -137,7 +137,7 @@ export function MultiMonthCalendar({ categories, initialYear, initialMonth, big 
           const iso = isoOf(d);
           const marks = categories.map((c, ci) => setsByCat[ci].has(iso) ? c.color : null).filter(Boolean);
           return (
-            <div key={i} style={{ position: "relative", height: cellSize, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: isToday(d) ? T.accentSoft : T.cardAlt, border: `1px solid ${T.line}` }}>
+            <div key={i} onClick={() => onDayClick && onDayClick(iso)} style={{ position: "relative", height: cellSize, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: isToday(d) ? T.accentSoft : T.cardAlt, border: `1px solid ${T.line}`, cursor: onDayClick ? "pointer" : "default" }}>
               <EventRing size={Math.round(cellSize * 0.72)} colors={marks} thickness={big ? 3 : 2.5} />
               <span style={{ position: "relative", font: `600 ${big ? 15 : 13}px ${sans}`, color: T.ink }}>{d}</span>
             </div>

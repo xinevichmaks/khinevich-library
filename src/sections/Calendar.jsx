@@ -1,5 +1,7 @@
-import { Card, T, sans } from "../ui.jsx";
-import { MultiMonthCalendar } from "../calendar.jsx";
+import { useState } from "react";
+import { Link2, Copy, Check } from "lucide-react";
+import { Card, Modal, T, sans, btn, btnGhost } from "../ui.jsx";
+import { MultiMonthCalendar, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol } from "../useDB.js";
 
@@ -9,6 +11,9 @@ export default function CalendarPage() {
   const { items: schedule } = useCol("schedule");
   const { items: mocks } = useCol("mocks");
   const { items: homework } = useCol("homework");
+  const [dayOpen, setDayOpen] = useState(null); // iso дата
+  const [subscribeOpen, setSubscribeOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const scoped = (arr) => (sid ? arr.filter((x) => x.studentId === sid) : arr);
 
@@ -22,12 +27,80 @@ export default function CalendarPage() {
     { dates: hwDates, color: "#3b6ea5", legend: "дедлайн ДЗ" },
   ];
 
+  const dayLessons = dayOpen ? scoped(schedule).filter((l) => l.date === dayOpen && l.status !== "cancelled") : [];
+  const dayMocks = dayOpen ? scoped(mocks).filter((m) => m.date === dayOpen) : [];
+  const dayHw = dayOpen ? scoped(homework).filter((h) => h.due === dayOpen && h.status !== "Проверена") : [];
+
+  const feedUrl = `${window.location.origin}/.netlify/functions/calendar-ics?studentId=${sid || "all"}`;
+  const copyLink = () => { navigator.clipboard.writeText(feedUrl); setCopied(true); setTimeout(() => setCopied(false), 1800); };
+
   return (
     <div>
-      <div style={{ font: `13px ${sans}`, color: T.faint, marginBottom: 16 }}>Общий календарь: занятия, пробники и сроки сдачи домашних заданий {sid ? "" : "по всем ученикам"}.</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ font: `13px ${sans}`, color: T.faint }}>Общий календарь: занятия, пробники и сроки сдачи домашних заданий {sid ? "" : "по всем ученикам"}. Нажмите на дату, чтобы увидеть детали.</div>
+        <button style={btnGhost} onClick={() => setSubscribeOpen(true)}><Link2 size={15} />Подключить к Apple Calendar</button>
+      </div>
       <Card style={{ padding: 22 }}>
-        <MultiMonthCalendar categories={categories} big />
+        <MultiMonthCalendar categories={categories} big onDayClick={setDayOpen} />
       </Card>
+
+      {/* ---------- детали дня ---------- */}
+      <Modal open={!!dayOpen} onClose={() => setDayOpen(null)} title={dayOpen ? fmtDateRu(dayOpen) : ""}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {dayLessons.length === 0 && dayMocks.length === 0 && dayHw.length === 0 && (
+            <div style={{ font: `14px ${sans}`, color: T.faint }}>На эту дату ничего не запланировано.</div>
+          )}
+          {dayLessons.length > 0 && (
+            <div>
+              <div style={{ font: `600 12px ${sans}`, color: T.down, textTransform: "uppercase", marginBottom: 6 }}>Занятия</div>
+              {dayLessons.map((l) => (
+                <div key={l.id} style={{ padding: "8px 0", borderTop: `1px solid ${T.line}`, font: `14px ${sans}`, color: T.ink }}>
+                  <b>{l.time || "время не указано"}</b> — {l.topic}{role === "tutor" ? ` · ${l.studentName}` : ""}
+                </div>
+              ))}
+            </div>
+          )}
+          {dayMocks.length > 0 && (
+            <div>
+              <div style={{ font: `600 12px ${sans}`, color: T.up, textTransform: "uppercase", marginBottom: 6 }}>Пробники</div>
+              {dayMocks.map((m) => (
+                <div key={m.id} style={{ padding: "8px 0", borderTop: `1px solid ${T.line}`, font: `14px ${sans}`, color: T.ink }}>
+                  {m.title}{role === "tutor" ? ` · ${m.studentName}` : ""}
+                </div>
+              ))}
+            </div>
+          )}
+          {dayHw.length > 0 && (
+            <div>
+              <div style={{ font: `600 12px ${sans}`, color: "#3b6ea5", textTransform: "uppercase", marginBottom: 6 }}>Дедлайны домашних заданий</div>
+              {dayHw.map((h) => (
+                <div key={h.id} style={{ padding: "8px 0", borderTop: `1px solid ${T.line}`, font: `14px ${sans}`, color: T.ink }}>
+                  {h.title}{role === "tutor" ? ` · ${h.studentName}` : ""}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* ---------- подписка на календарь в Apple Calendar ---------- */}
+      <Modal open={subscribeOpen} onClose={() => setSubscribeOpen(false)} title="Подключить к Apple Calendar">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ font: `14px/1.6 ${sans}`, color: T.soft }}>
+            Эта ссылка — живая подписка: календарь на iPhone/Mac будет сам обновляться, когда расписание меняется на сайте. Напоминание ставится автоматически за 30 минут до каждого занятия.
+          </div>
+          <ol style={{ font: `13px/1.7 ${sans}`, color: T.faint, paddingLeft: 18, margin: 0 }}>
+            <li>Скопируйте ссылку ниже</li>
+            <li>На iPhone/Mac: Календарь → Файл → Новая подписка на календарь (на iPhone: Настройки → Календарь → Учётные записи → Добавить учётную запись → Другое → Подписной календарь)</li>
+            <li>Вставьте ссылку и подтвердите</li>
+          </ol>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: T.cardAlt, font: `13px ${sans}`, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{feedUrl}</div>
+            <button style={btn} onClick={copyLink}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? "Скопировано" : "Копировать"}</button>
+          </div>
+          <div style={{ font: `12px ${sans}`, color: T.faint }}>{sid ? "Эта ссылка покажет только ваши занятия." : "Эта ссылка (как у репетитора) покажет занятия всех учеников."}</div>
+        </div>
+      </Modal>
     </div>
   );
 }

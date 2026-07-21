@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Mail, BookOpen, ClipboardList, Award, TrendingUp, Users as UsersIcon, X } from "lucide-react";
-import { Card, Modal, T, serif, sans, chip, Avatar, initials, SUBJECTS } from "../ui.jsx";
+import { Mail, BookOpen, ClipboardList, Award, TrendingUp, Users as UsersIcon, X, Trash2 } from "lucide-react";
+import { Card, Modal, T, serif, sans, chip, btnGhost, Avatar, initials, SUBJECTS } from "../ui.jsx";
 import { CandleChart } from "../chart.jsx";
-import { useCol, updateItem } from "../useDB.js";
+import { useCol, updateItem, removeItem } from "../useDB.js";
 import { averagePct, computeWeakTopics } from "../grading.js";
 
 export default function Students() {
@@ -134,6 +134,16 @@ export default function Students() {
                 <UsersIcon size={15} />
                 {parent ? `Родительский аккаунт подключён: ${parent.name}` : "Родительский аккаунт пока не подключён"}
               </div>
+
+              <button
+                style={{ ...btnGhost, color: "#a23b2d", alignSelf: "flex-start" }}
+                onClick={() => {
+                  if (confirm(`Удалить ${st.name} из списка учеников? Вход в аккаунт для ученика станет недоступен внутри приложения, но история домашних заданий и оценок сохранится в базе.`)) {
+                    removeItem("users", st.id);
+                    setOpen(null);
+                  }
+                }}
+              ><Trash2 size={15} />Удалить ученика</button>
             </div>
           );
         })()}

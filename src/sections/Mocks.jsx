@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Plus, Trash2, ListChecks, Check, X, Eye } from "lucide-react";
-import { Card, Modal, T, sans, btn, btnGhost, input, chip } from "../ui.jsx";
+import { Plus, Trash2, ListChecks, Check, X, Eye, Search, Settings2, Tag } from "lucide-react";
+import { Card, Modal, T, sans, btn, btnGhost, iconBtn, input, chip, TAG_PALETTE } from "../ui.jsx";
 import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
@@ -25,8 +25,18 @@ export default function Mocks() {
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
   const { items: users } = useCol("users");
   const { items: mocks } = useCol("mocks");
+  const { items: tags } = useCol("mockTags");
   const students = users.filter((u) => u.role === "student");
-  const list = sid ? mocks.filter((m) => m.studentId === sid) : mocks;
+  const scoped = sid ? mocks.filter((m) => m.studentId === sid) : mocks;
+  const [q, setQ] = useState("");
+  const [filterTag, setFilterTag] = useState(null);
+  const [tagManager, setTagManager] = useState(false);
+  const [tagging, setTagging] = useState(null);
+  const list = scoped.filter((m) =>
+    (m.title + " " + (m.subject || "") + " " + (m.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
+    (!filterTag || (m.tagIds || []).includes(filterTag))
+  );
+  const tagById = (id) => tags.find((t) => t.id === id);
 
   const [add, setAdd] = useState(false);
   const [targetIds, setTargetIds] = useState(new Set());
@@ -121,12 +131,33 @@ export default function Mocks() {
 
   return (
     <div>
-      {role === "tutor" && <div style={{ marginBottom: 16 }}><button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Добавить пробник</button></div>}
+      {role === "tutor" && <div style={{ marginBottom: 16, display: "flex", gap: 10 }}>
+        <button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Добавить пробник</button>
+        <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
+      </div>}
+
+      <div style={{ position: "relative", marginBottom: 12 }}>
+        <Search size={17} color={T.faint} style={{ position: "absolute", left: 12, top: 11 }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по пробникам…" style={{ ...input, paddingLeft: 38 }} />
+      </div>
+      {tags.length > 0 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ font: `12px ${sans}`, color: T.faint }}>Теги:</span>
+          <button onClick={() => setFilterTag(null)} style={{ ...chip, background: !filterTag ? T.accent : T.line, color: !filterTag ? "#fff" : T.soft, border: "none", cursor: "pointer" }}>Все</button>
+          {tags.map((t) => (
+            <button key={t.id} onClick={() => setFilterTag(filterTag === t.id ? null : t.id)} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...chip, background: filterTag === t.id ? t.color : T.card, color: filterTag === t.id ? "#fff" : T.ink, border: `1px solid ${filterTag === t.id ? t.color : T.line}`, cursor: "pointer" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, display: "inline-block" }} />{t.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {list.map((m) => {
           const answered = Array.isArray(m.answers);
           const needsReview = m.status === "Требует проверки";
           const statusBg = m.status === "Пройден" ? "#cfe0cf" : needsReview ? "#f0d9a6" : T.line;
+          const mTags = (m.tagIds || []).map(tagById).filter(Boolean);
           return (
             <Card key={m.id} style={{ padding: 16 }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -136,12 +167,20 @@ export default function Mocks() {
                 {answered && <span style={chip}>{m.score}/{m.total} б.</span>}
                 <span style={{ ...chip, background: statusBg }}>{m.status}</span>
               </div>
+              {mTags.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                  {mTags.map((t) => (
+                    <span key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, font: `11px ${sans}`, color: T.faint }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: t.color }} />{t.name}</span>
+                  ))}
+                </div>
+              )}
               {role === "tutor" && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{m.studentName}</div>}
               <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>дата: {fmtDateRu(m.date) || "—"}</div>
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 {role === "student" && !answered && <button style={btn} onClick={() => { setTaking(m); setAnswers({}); }}>Пройти пробник</button>}
                 {answered && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setReview(m)}><ListChecks size={15} />Разбор ответов</button>}
                 {role === "tutor" && needsReview && <button style={btn} onClick={() => { setGrading(m); setGradeInputs(m.manualScores || {}); }}>✍️ Проверить вручную</button>}
+                {role === "tutor" && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(m)}><Tag size={15} /></button>}
                 {role === "tutor" && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("mocks", m.id)}><Trash2 size={15} /></button>}
               </div>
             </Card>
@@ -400,6 +439,73 @@ export default function Mocks() {
           </div>
         )}
       </Modal>
+
+      {/* ---------- назначение тегов уже созданному пробнику ---------- */}
+      <Modal open={!!tagging} onClose={() => setTagging(null)} title={tagging ? `Теги: ${tagging.title}` : ""}>
+        {tagging && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {tags.length === 0 && <div style={{ font: `13px ${sans}`, color: T.faint }}>Тегов ещё нет — создайте их через кнопку «Теги» в списке пробников.</div>}
+            {tags.map((t) => {
+              const current = tagging.tagIds || [];
+              const on = current.includes(t.id);
+              const toggle = async () => {
+                const next = on ? current.filter((x) => x !== t.id) : [...current, t.id];
+                await updateItem("mocks", tagging.id, { tagIds: next });
+                setTagging({ ...tagging, tagIds: next });
+              };
+              return (
+                <button key={t.id} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? t.color : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: t.color }} />{t.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
+
+      {/* ---------- менеджер тегов пробников (отдельно от библиотеки и домашки) ---------- */}
+      <Modal open={tagManager} onClose={() => setTagManager(false)} title="Теги пробников" wide>
+        <MockTagManager tags={tags} />
+      </Modal>
+    </div>
+  );
+}
+
+function MockTagManager({ tags }) {
+  const [name, setName] = useState("");
+  const [colorIdx, setColorIdx] = useState(0);
+  const addTag = async () => {
+    if (!name.trim()) return;
+    await addItem("mockTags", { name: name.trim(), color: TAG_PALETTE[colorIdx] });
+    setName(""); setColorIdx(0);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ font: `13px ${sans}`, color: T.faint }}>Эти теги отдельные от тегов библиотеки и домашки — только для пробников.</div>
+      {tags.map((t) => (
+        <div key={t.id} style={{ padding: "10px 0", borderBottom: `1px solid ${T.line}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <span style={{ width: 16, height: 16, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
+            <input style={input} defaultValue={t.name} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== t.name) updateItem("mockTags", t.id, { name: e.target.value.trim() }); }} />
+            <button onClick={() => removeItem("mockTags", t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: T.faint }}><Trash2 size={15} /></button>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {TAG_PALETTE.map((c) => (
+              <button key={c} onClick={() => updateItem("mockTags", t.id, { color: c })} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: `2px solid ${t.color === c ? T.ink : "transparent"}`, cursor: "pointer" }} />
+            ))}
+          </div>
+        </div>
+      ))}
+      <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 14 }}>
+        <div style={{ font: `600 13px ${sans}`, color: T.ink, marginBottom: 8 }}>Новый тег</div>
+        <input style={{ ...input, marginBottom: 10 }} placeholder="Название тега" value={name} onChange={(e) => setName(e.target.value)} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          {TAG_PALETTE.map((c, i) => (
+            <button key={c} onClick={() => setColorIdx(i)} style={{ width: 26, height: 26, borderRadius: "50%", background: c, border: `2px solid ${colorIdx === i ? T.ink : "transparent"}`, cursor: "pointer" }} />
+          ))}
+        </div>
+        <button style={{ ...btn, padding: "8px 13px" }} onClick={addTag}><Plus size={15} />Добавить тег</button>
+      </div>
     </div>
   );
 }
