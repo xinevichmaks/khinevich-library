@@ -40,4 +40,4 @@ export function Modal({ open, onClose, title, children, wide }) {
   );
 }
 export const initials = (name = "?") => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
-export const ROLE_LABEL = { tutor: "Репетитор", student: "Ученик", parent: "Родитель" };
+export const ROLE_LABEL = { admin: "Администратор", tutor: "Репетитор", student: "Ученик", parent: "Родитель" };

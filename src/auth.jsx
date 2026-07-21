@@ -30,7 +30,12 @@ export function AuthProvider({ children }) {
 
   const register = async ({ name, email, password, role, subject }) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    const data = { name, email, role, createdAt: Date.now(), ...(role === "student" && subject ? { subject } : {}) };
+    const needsApproval = role === "tutor" || role === "admin";
+    const data = {
+      name, email, role, createdAt: Date.now(),
+      ...(role === "student" && subject ? { subject } : {}),
+      ...(needsApproval ? { approved: false } : {}),
+    };
     await setDoc(doc(db, "users", cred.user.uid), data);
     setProfile({ uid: cred.user.uid, ...data });
   };

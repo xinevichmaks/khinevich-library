@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutGrid, BookOpen, Youtube, ClipboardList, PenLine,
   CalendarDays, Calendar as CalendarIcon, Award, PencilLine, Menu, X, Bell,
-  GraduationCap, User, Users, LogOut, ChevronRight,
+  GraduationCap, User, Users, LogOut, ChevronRight, ShieldCheck,
 } from "lucide-react";
 import { T, serif, sans, Card, Avatar, btn, input, ROLE_LABEL, initials, SUBJECTS } from "./ui.jsx";
 import { useAuth } from "./auth.jsx";
@@ -10,6 +10,7 @@ import { useCol, setUserDoc } from "./useDB.js";
 
 import Dashboard from "./sections/Dashboard.jsx";
 import Students from "./sections/Students.jsx";
+import Tutors from "./sections/Tutors.jsx";
 import Library from "./sections/Library.jsx";
 import Useful from "./sections/Useful.jsx";
 import Homework from "./sections/Homework.jsx";
@@ -20,16 +21,17 @@ import Mocks from "./sections/Mocks.jsx";
 import Grades from "./sections/Grades.jsx";
 
 const NAV = [
-  { id: "dash", label: "Главная", Icon: LayoutGrid, roles: ["tutor", "student", "parent"] },
-  { id: "students", label: "Ученики", Icon: Users, roles: ["tutor"] },
-  { id: "lib", label: "Библиотека", Icon: BookOpen, roles: ["tutor", "student", "parent"] },
-  { id: "useful", label: "Полезное", Icon: Youtube, roles: ["tutor", "student", "parent"] },
-  { id: "homework", label: "Домашка", Icon: ClipboardList, roles: ["tutor", "student", "parent"] },
-  { id: "sched", label: "Расписание", Icon: CalendarDays, roles: ["tutor", "student", "parent"] },
-  { id: "calendar", label: "Календарь", Icon: CalendarIcon, roles: ["tutor", "student", "parent"] },
-  { id: "notifications", label: "Уведомления", Icon: Bell, roles: ["tutor", "student", "parent"] },
-  { id: "mocks", label: "Пробники", Icon: PencilLine, roles: ["tutor", "student", "parent"] },
-  { id: "grades", label: "Журнал оценок", Icon: Award, roles: ["tutor", "student", "parent"] },
+  { id: "dash", label: "Главная", Icon: LayoutGrid, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "students", label: "Ученики", Icon: Users, roles: ["tutor", "admin"] },
+  { id: "tutors", label: "Репетиторы", Icon: ShieldCheck, roles: ["admin"] },
+  { id: "lib", label: "Библиотека", Icon: BookOpen, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "useful", label: "Полезное", Icon: Youtube, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "homework", label: "Домашка", Icon: ClipboardList, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "sched", label: "Расписание", Icon: CalendarDays, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "calendar", label: "Календарь", Icon: CalendarIcon, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "notifications", label: "Уведомления", Icon: Bell, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "mocks", label: "Пробники", Icon: PencilLine, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "grades", label: "Журнал оценок", Icon: Award, roles: ["tutor", "admin", "student", "parent"] },
 ];
 
 const globalCss = `
@@ -62,6 +64,7 @@ export default function App() {
   if (loading) return <Splash text="Загрузка…" />;
   if (!user || !profile) return <><style>{globalCss}</style><Auth /></>;
   if (role === "parent" && !profile.childId) return <><style>{globalCss}</style><LinkChild /></>;
+  if ((role === "tutor" || role === "admin") && profile.approved === false) return <><style>{globalCss}</style><PendingApproval /></>;
 
   const NO_EXTRAS_SUBJECTS = ["Менторство", "Занятия с Марселькой"];
   const mySubject = role === "student" ? profile.subject : role === "parent" ? allUsers.find((u) => u.id === profile.childId)?.subject : null;
@@ -80,7 +83,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 18px" }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: T.ink, display: "grid", placeItems: "center", flexShrink: 0 }}><PenLine size={18} color="#fff" /></div>
           <div style={{ flex: 1 }}>
-            <div style={{ font: `700 17px ${serif}`, color: "#fff", lineHeight: 1.15 }}>Khinevich<br />Library</div>
+            <div style={{ font: `700 17px ${serif}`, color: "#fff", lineHeight: 1.15 }}>Tutors<br />Space</div>
             <div style={{ font: `11px ${sans}`, color: "rgba(255,255,255,.65)" }}>кабинет репетитора</div>
           </div>
           <button className="hamburger-btn" onClick={() => setNavOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,.8)" }}><X size={20} /></button>
@@ -110,6 +113,7 @@ export default function App() {
         <div className="app-content" style={{ padding: 28, flex: 1, overflow: "auto" }}>
           {current === "dash" && <Dashboard go={setTab} />}
           {current === "students" && <Students />}
+          {current === "tutors" && <Tutors />}
           {current === "lib" && <Library />}
           {current === "useful" && <Useful />}
           {current === "homework" && <Homework />}
@@ -132,9 +136,10 @@ function Splash({ text }) {
 function Auth() {
   const { login, register } = useAuth();
   const [mode, setMode] = useState("login");
-  const [f, setF] = useState({ name: "", email: "", password: "", role: "tutor", subject: SUBJECTS[0] });
+  const [f, setF] = useState({ name: "", email: "", password: "", role: "tutor", subject: SUBJECTS[0], code: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const REGISTRATION_CODE = "ЮНОСТЬ";
 
   const submit = async () => {
     setErr(""); setBusy(true);
@@ -142,6 +147,9 @@ function Auth() {
       if (mode === "login") await login(f.email, f.password);
       else {
         if (!f.name) throw new Error("Введите имя");
+        if ((f.role === "tutor" || f.role === "admin") && f.code.trim().toUpperCase() !== REGISTRATION_CODE) {
+          throw new Error("Неверный код регистрации для этой роли");
+        }
         await register(f);
       }
     } catch (e) {
@@ -154,7 +162,7 @@ function Auth() {
       <div style={{ width: "100%", maxWidth: 400 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11, justifyContent: "center", marginBottom: 22 }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: T.ink, display: "grid", placeItems: "center" }}><PenLine size={21} color="#fff" /></div>
-          <div style={{ font: `700 26px ${serif}`, color: T.ink }}>Khinevich Library</div>
+          <div style={{ font: `700 26px ${serif}`, color: T.ink }}>Tutors Space</div>
         </div>
         <Card style={{ padding: 26 }}>
           <div style={{ display: "flex", gap: 6, marginBottom: 18, background: T.bg, padding: 4, borderRadius: 10 }}>
@@ -168,11 +176,16 @@ function Auth() {
             <input style={input} type="password" placeholder="Пароль (мин. 6 символов)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
             {mode === "register" && <>
               <div style={{ font: `12px ${sans}`, color: T.soft, marginTop: 4 }}>Я регистрируюсь как:</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {[["tutor", GraduationCap], ["student", User], ["parent", Users]].map(([r, Ic]) => (
-                  <button key={r} onClick={() => setF({ ...f, role: r })} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "10px 4px", borderRadius: 8, cursor: "pointer", border: `1.5px solid ${f.role === r ? T.accent : T.line}`, background: f.role === r ? T.accentSoft : T.cardAlt, font: `600 12px ${sans}`, color: T.ink }}><Ic size={17} />{ROLE_LABEL[r]}</button>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[["tutor", GraduationCap], ["admin", ShieldCheck], ["student", User], ["parent", Users]].map(([r, Ic]) => (
+                  <button key={r} onClick={() => setF({ ...f, role: r })} style={{ flex: "1 1 45%", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "10px 4px", borderRadius: 8, cursor: "pointer", border: `1.5px solid ${f.role === r ? T.accent : T.line}`, background: f.role === r ? T.accentSoft : T.cardAlt, font: `600 12px ${sans}`, color: T.ink }}><Ic size={17} />{ROLE_LABEL[r]}</button>
                 ))}
               </div>
+            </>}
+            {mode === "register" && (f.role === "tutor" || f.role === "admin") && <>
+              <div style={{ font: `12px ${sans}`, color: T.soft, marginTop: 4 }}>Код регистрации для этой роли:</div>
+              <input style={input} type="password" placeholder="Код" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} />
+              <div style={{ font: `11.5px ${sans}`, color: T.faint }}>После регистрации доступ должен подтвердить действующий репетитор или администратор.</div>
             </>}
             {mode === "register" && f.role === "student" && <>
               <div style={{ font: `12px ${sans}`, color: T.soft, marginTop: 4 }}>Какой предмет будете изучать:</div>
@@ -185,6 +198,23 @@ function Auth() {
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/* ---------- ожидание подтверждения доступа (для новых репетиторов/админов) ---------- */
+function PendingApproval() {
+  const { profile, logout } = useAuth();
+  return (
+    <div style={{ minHeight: "100vh", background: T.bg, display: "grid", placeItems: "center", padding: 20 }}>
+      <Card style={{ padding: 32, maxWidth: 420, textAlign: "center" }}>
+        <ShieldCheck size={34} color={T.accent} style={{ marginBottom: 12 }} />
+        <div style={{ font: `700 18px ${serif}`, color: T.ink, marginBottom: 8 }}>Ожидает подтверждения</div>
+        <div style={{ font: `14px/1.6 ${sans}`, color: T.soft, marginBottom: 18 }}>
+          Аккаунт «{profile.name}» ({ROLE_LABEL[profile.role]}) зарегистрирован, но доступ должен подтвердить действующий репетитор или администратор в разделе «Репетиторы». Как только подтвердят — сможете войти.
+        </div>
+        <button style={btn} onClick={logout}>Выйти</button>
+      </Card>
     </div>
   );
 }

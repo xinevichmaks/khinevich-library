@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Mail, BookOpen, ClipboardList, Award, TrendingUp, Users as UsersIcon, X, Trash2 } from "lucide-react";
-import { Card, Modal, T, serif, sans, chip, btnGhost, Avatar, initials, SUBJECTS } from "../ui.jsx";
+import { Mail, BookOpen, ClipboardList, Award, TrendingUp, Users as UsersIcon, X, Trash2, Check, ShieldCheck } from "lucide-react";
+import { Card, Modal, T, serif, sans, chip, btnGhost, btn, Avatar, initials, SUBJECTS, ROLE_LABEL } from "../ui.jsx";
 import { CandleChart } from "../chart.jsx";
+import { useAuth } from "../auth.jsx";
 import { useCol, updateItem, removeItem } from "../useDB.js";
 import { averagePct, computeWeakTopics } from "../grading.js";
 
 export default function Students() {
+  const { role } = useAuth();
   const { items: users } = useCol("users");
   const { items: homework } = useCol("homework");
   const { items: grades } = useCol("grades");
@@ -33,8 +35,30 @@ export default function Students() {
     return { pendingHw: pendingHw.length, doneLessons, avg, rows, weak, hwTotal: hw.length };
   };
 
+  const pendingStaff = users.filter((u) => (u.role === "tutor" || u.role === "admin") && u.approved === false);
+  const approveStaff = (u) => updateItem("users", u.id, { approved: true });
+  const rejectStaff = (u) => { if (confirm(`Отклонить заявку «${u.name}»?`)) removeItem("users", u.id); };
+
   return (
     <div>
+      {(role === "tutor" || role === "admin") && pendingStaff.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ font: `600 14px ${sans}`, color: T.ink, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><ShieldCheck size={16} color={T.accent} />Ожидают подтверждения доступа</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {pendingStaff.map((u) => (
+              <Card key={u.id} style={{ padding: 14, display: "flex", alignItems: "center", gap: 12, border: "1.5px solid #f0d9a6" }}>
+                <Avatar text={initials(u.name)} size={38} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ font: `600 14px ${sans}`, color: T.ink }}>{u.name}</div>
+                  <div style={{ font: `12px ${sans}`, color: T.faint }}>{u.email} · регистрируется как {ROLE_LABEL[u.role]}</div>
+                </div>
+                <button style={{ ...btn, padding: "8px 13px" }} onClick={() => approveStaff(u)}><Check size={15} />Одобрить</button>
+                <button style={{ ...btnGhost, padding: "8px 13px", color: "#a23b2d" }} onClick={() => rejectStaff(u)}><X size={15} />Отклонить</button>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ font: `13px ${sans}`, color: T.faint, marginBottom: 16 }}>Общий реестр учеников — успеваемость, занятия, слабые места и связанные аккаунты родителей.</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 14 }}>
         {students.map((st) => {
