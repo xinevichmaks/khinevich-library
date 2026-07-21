@@ -84,7 +84,7 @@ function buildEvent({ uid, dateISO, timeHHMM, durationMin = 60, summary, descrip
   return lines.join("\r\n");
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   try {
     const studentId = (event.queryStringParameters && event.queryStringParameters.studentId) || "all";
     const idToken = await getTempIdToken();
