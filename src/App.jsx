@@ -4,7 +4,7 @@ import {
   CalendarDays, Calendar as CalendarIcon, Award, PencilLine, Menu, X, Bell,
   GraduationCap, User, Users, LogOut, ChevronRight, ShieldCheck,
 } from "lucide-react";
-import { Settings, UserCog } from "lucide-react";
+import { Settings, UserCog, StickyNote, KeyRound } from "lucide-react";
 import { T, serif, sans, Card, Avatar, btn, input, ROLE_LABEL, initials, SUBJECTS } from "./ui.jsx";
 import { useAuth } from "./auth.jsx";
 import { useCol, setUserDoc } from "./useDB.js";
@@ -22,21 +22,25 @@ import Mocks from "./sections/Mocks.jsx";
 import Grades from "./sections/Grades.jsx";
 import SettingsPage from "./sections/Settings.jsx";
 import Profiles from "./sections/Profiles.jsx";
+import Notes from "./sections/Notes.jsx";
+import Accounts from "./sections/Accounts.jsx";
 
 const NAV = [
   { id: "dash", label: "Главная", Icon: LayoutGrid, roles: ["tutor", "admin", "student", "parent"] },
-  { id: "students", label: "Ученики", Icon: Users, roles: ["tutor", "admin"] },
-  { id: "tutors", label: "Репетиторы", Icon: ShieldCheck, roles: ["admin"] },
-  { id: "profiles", label: "Профили", Icon: UserCog, roles: ["admin"] },
   { id: "lib", label: "Библиотека", Icon: BookOpen, roles: ["tutor", "admin", "student", "parent"] },
   { id: "useful", label: "Полезное", Icon: Youtube, roles: ["tutor", "admin", "student", "parent"] },
   { id: "homework", label: "Домашка", Icon: ClipboardList, roles: ["tutor", "admin", "student", "parent"] },
   { id: "sched", label: "Расписание", Icon: CalendarDays, roles: ["tutor", "admin", "student", "parent"] },
   { id: "calendar", label: "Календарь", Icon: CalendarIcon, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "notes", label: "Заметки", Icon: StickyNote, roles: ["tutor", "admin", "student", "parent"] },
   { id: "notifications", label: "Уведомления", Icon: Bell, roles: ["tutor", "admin", "student", "parent"] },
   { id: "mocks", label: "Пробники", Icon: PencilLine, roles: ["tutor", "admin", "student", "parent"] },
   { id: "grades", label: "Журнал оценок", Icon: Award, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "students", label: "Ученики", Icon: Users, roles: ["tutor", "admin"] },
+  { id: "tutors", label: "Репетиторы", Icon: ShieldCheck, roles: ["admin"] },
+  { id: "profiles", label: "Профили", Icon: UserCog, roles: ["admin"] },
   { id: "settings", label: "Настройки", Icon: Settings, roles: ["tutor", "admin"] },
+  { id: "accounts", label: "Управление аккаунтами", Icon: KeyRound, roles: ["admin"] },
 ];
 
 const globalCss = `
@@ -61,7 +65,7 @@ input,textarea,select,button{font-family:${sans}}
 `;
 
 export default function App() {
-  const { user, profile, role, loading, logout, isImpersonating, stopImpersonate, realProfile } = useAuth();
+  const { user, profile, role, loading, logout, isImpersonating, stopImpersonate, realProfile, canSwitchSelfRole, setSelfRoleView } = useAuth();
   const [tab, setTab] = useState("dash");
   const [navOpen, setNavOpen] = useState(false);
   const { items: allUsers } = useCol("users");
@@ -98,7 +102,14 @@ export default function App() {
             <button key={id} onClick={() => goTab(id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", background: current === id ? T.accent : "transparent", color: current === id ? "#fff" : "rgba(255,255,255,.78)", font: `600 14px ${sans}`, textAlign: "left" }}><Icon size={18} />{label}</button>
           ))}
         </nav>
-        <div style={{ marginTop: "auto", paddingTop: 12, borderTop: `1px solid ${T.sidebarLine}`, display: "flex", alignItems: "center", gap: 10 }}>
+        {canSwitchSelfRole && !isImpersonating && (
+          <div style={{ display: "flex", gap: 4, padding: 4, background: "rgba(0,0,0,.2)", borderRadius: 9, marginTop: 10 }}>
+            {["admin", "tutor"].map((r) => (
+              <button key={r} onClick={() => setSelfRoleView(r)} style={{ flex: 1, padding: "7px 4px", borderRadius: 6, border: "none", cursor: "pointer", background: role === r ? "#fff" : "transparent", color: role === r ? T.accent : "rgba(255,255,255,.75)", font: `600 12px ${sans}` }}>{ROLE_LABEL[r]}</button>
+            ))}
+          </div>
+        )}
+        <div style={{ marginTop: canSwitchSelfRole ? 12 : "auto", paddingTop: 12, borderTop: `1px solid ${T.sidebarLine}`, display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar text={initials(profile.name)} size={34} bg="#fff" color="#111" />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ font: `600 13px ${sans}`, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</div>
@@ -135,6 +146,8 @@ export default function App() {
           {current === "mocks" && <Mocks />}
           {current === "grades" && <Grades />}
           {current === "settings" && <SettingsPage />}
+          {current === "notes" && <Notes />}
+          {current === "accounts" && <Accounts />}
         </div>
       </main>
     </div>

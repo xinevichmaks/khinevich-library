@@ -11,25 +11,30 @@ export default function CalendarPage() {
   const { items: schedule } = useCol("schedule");
   const { items: mocks } = useCol("mocks");
   const { items: homework } = useCol("homework");
+  const { items: notes } = useCol("notes");
   const [dayOpen, setDayOpen] = useState(null); // iso дата
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const scoped = (arr) => (sid ? arr.filter((x) => x.studentId === sid) : arr);
+  const scopedNotes = sid ? notes.filter((n) => !n.studentId || n.studentId === sid) : notes;
 
   const lessonDates = scoped(schedule).filter((l) => l.status !== "cancelled").map((l) => l.date).filter(Boolean);
   const mockDates = scoped(mocks).map((m) => m.date).filter(Boolean);
   const hwDates = scoped(homework).filter((h) => h.status !== "Проверена").map((h) => h.due).filter(Boolean);
+  const noteDates = scopedNotes.filter((n) => n.status !== "done").map((n) => n.due).filter(Boolean);
 
   const categories = [
     { dates: lessonDates, color: T.down, legend: "занятие" },
     { dates: mockDates, color: T.up, legend: "пробник" },
     { dates: hwDates, color: "#3b6ea5", legend: "дедлайн ДЗ" },
+    { dates: noteDates, color: "#8a5aab", legend: "заметка" },
   ];
 
   const dayLessons = dayOpen ? scoped(schedule).filter((l) => l.date === dayOpen && l.status !== "cancelled") : [];
   const dayMocks = dayOpen ? scoped(mocks).filter((m) => m.date === dayOpen) : [];
   const dayHw = dayOpen ? scoped(homework).filter((h) => h.due === dayOpen && h.status !== "Проверена") : [];
+  const dayNotes = dayOpen ? scopedNotes.filter((n) => n.due === dayOpen && n.status !== "done") : [];
 
   const feedUrl = `${window.location.origin}/.netlify/functions/calendar-ics?studentId=${sid || "all"}`;
   const copyLink = () => { navigator.clipboard.writeText(feedUrl); setCopied(true); setTimeout(() => setCopied(false), 1800); };
@@ -47,7 +52,7 @@ export default function CalendarPage() {
       {/* ---------- детали дня ---------- */}
       <Modal open={!!dayOpen} onClose={() => setDayOpen(null)} title={dayOpen ? fmtDateRu(dayOpen) : ""}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {dayLessons.length === 0 && dayMocks.length === 0 && dayHw.length === 0 && (
+          {dayLessons.length === 0 && dayMocks.length === 0 && dayHw.length === 0 && dayNotes.length === 0 && (
             <div style={{ font: `14px ${sans}`, color: T.faint }}>На эту дату ничего не запланировано.</div>
           )}
           {dayLessons.length > 0 && (
@@ -76,6 +81,16 @@ export default function CalendarPage() {
               {dayHw.map((h) => (
                 <div key={h.id} style={{ padding: "8px 0", borderTop: `1px solid ${T.line}`, font: `14px ${sans}`, color: T.ink }}>
                   {h.title}{role === "tutor" ? ` · ${h.studentName}` : ""}
+                </div>
+              ))}
+            </div>
+          )}
+          {dayNotes.length > 0 && (
+            <div>
+              <div style={{ font: `600 12px ${sans}`, color: "#8a5aab", textTransform: "uppercase", marginBottom: 6 }}>Заметки</div>
+              {dayNotes.map((n) => (
+                <div key={n.id} style={{ padding: "8px 0", borderTop: `1px solid ${T.line}`, font: `14px ${sans}`, color: T.ink }}>
+                  {n.text}{n.studentName ? ` · ${n.studentName}` : ""}
                 </div>
               ))}
             </div>

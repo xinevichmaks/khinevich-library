@@ -9,11 +9,15 @@ import { auth, db } from "./firebase";
 const Ctx = createContext(null);
 export const useAuth = () => useContext(Ctx);
 
+// Только для этого аккаунта — возможность переключаться между «Админ» и «Репетитор» самого себя.
+const DUAL_ROLE_UID = "xRMxAshFalheRKJR6UYtFdGc1ax1";
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [impersonating, setImpersonating] = useState(null); // {uid, role, name, ...} — только для admin
+  const [selfRoleView, setSelfRoleView] = useState(null); // "admin" | "tutor" | null — переключатель для DUAL_ROLE_UID
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -42,11 +46,14 @@ export function AuthProvider({ children }) {
     setProfile({ uid: cred.user.uid, ...data });
   };
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
-  const logout = () => { setImpersonating(null); return signOut(auth); };
+  const logout = () => { setImpersonating(null); setSelfRoleView(null); return signOut(auth); };
 
-  // Эффективные профиль/роль — с учётом «просмотра от лица» (только для admin).
+  const canSwitchSelfRole = profile?.uid === DUAL_ROLE_UID;
+
+  // Эффективные профиль/роль — с учётом «просмотра от лица» (admin) и переключателя своей роли.
   const effectiveProfile = impersonating || profile;
-  const effectiveRole = impersonating ? impersonating.role : profile?.role;
+  let effectiveRole = impersonating ? impersonating.role : profile?.role;
+  if (!impersonating && canSwitchSelfRole && selfRoleView) effectiveRole = selfRoleView;
 
   return (
     <Ctx.Provider value={{
@@ -55,6 +62,7 @@ export function AuthProvider({ children }) {
       isImpersonating: !!impersonating,
       startImpersonate: (u) => setImpersonating({ ...u, uid: u.id }),
       stopImpersonate: () => setImpersonating(null),
+      canSwitchSelfRole, selfRoleView: selfRoleView || profile?.role, setSelfRoleView,
     }}>
       {children}
     </Ctx.Provider>

@@ -1,10 +1,10 @@
-import { Bell, BookOpen, Award, CheckCircle2, Trash2 } from "lucide-react";
+import { Bell, BookOpen, Award, CheckCircle2, Trash2, StickyNote } from "lucide-react";
 import { Card, T, sans, btnGhost } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, updateItem, removeItem } from "../useDB.js";
 
-const TYPE_ICON = { new_homework: BookOpen, homework_done: CheckCircle2, new_grade: Award, homework_checked: CheckCircle2 };
-const TYPE_COLOR = { new_homework: "#3b6ea5", homework_done: "#3f8f82", new_grade: T.accent, homework_checked: "#4b8f5c" };
+const TYPE_ICON = { new_homework: BookOpen, homework_done: CheckCircle2, new_grade: Award, homework_checked: CheckCircle2, new_note: StickyNote };
+const TYPE_COLOR = { new_homework: "#3b6ea5", homework_done: "#3f8f82", new_grade: T.accent, homework_checked: "#4b8f5c", new_note: "#8a5aab" };
 
 function timeAgo(ts) {
   if (!ts) return "";
