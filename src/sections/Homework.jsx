@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X, Search, Settings2, Tag } from "lucide-react";
+import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X, Search, Settings2, Tag, Repeat } from "lucide-react";
 import { Card, Modal, T, sans, btn, btnGhost, iconBtn, input, chip, TAG_PALETTE } from "../ui.jsx";
 import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
@@ -29,6 +29,8 @@ export default function Homework() {
   const [filterTag, setFilterTag] = useState(null);
   const [tagManager, setTagManager] = useState(false);
   const [tagging, setTagging] = useState(null); // домашка, которой сейчас назначаем теги
+  const [reassigning, setReassigning] = useState(null); // домашка, которую переназначаем
+  const [reassignIds, setReassignIds] = useState(new Set());
 
   const [doingText, setDoingText] = useState(null); // домашка без вопросов — текстовая сдача
   const [submissionText, setSubmissionText] = useState("");
@@ -78,6 +80,18 @@ export default function Homework() {
     await notify(doingQuiz.studentId, doingQuiz.studentName, `${doingQuiz.studentName} выполнил(а) задание «${doingQuiz.title}» — ${score}/${doingQuiz.questions.length}`, "homework_done");
     setDoingQuiz(null); setAnswers({}); setSubmissionText("");
   };
+
+  const doReassign = async () => {
+    if (!reassigning || reassignIds.size === 0) return;
+    const { id, createdAt, studentId, studentName, status, score, total, answers, submission, submittedAt, grade, ...rest } = reassigning;
+    await Promise.all([...reassignIds].map(async (sid2) => {
+      const st = users.find((u) => u.id === sid2);
+      await addItem("homework", { ...rest, studentId: sid2, studentName: st?.name || "", status: "Выдана" });
+      await notify(sid2, st?.name || "", `Новое домашнее задание: «${reassigning.title}»`, "new_homework");
+    }));
+    setReassigning(null); setReassignIds(new Set());
+  };
+  const toggleReassign = (id) => setReassignIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   return (
     <div>
@@ -158,6 +172,7 @@ export default function Homework() {
                     <button style={btn} onClick={async () => { const v = document.getElementById(`g-${h.id}`).value; await updateItem("homework", h.id, { status: "Проверена", grade: v || "—" }); await notify(h.studentId, h.studentName, `Домашнее задание проверено: «${h.title}» — оценка ${v || "—"}`, "homework_checked"); }}>Принять</button>
                   </>}
                   {role === "tutor" && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(h)}><Tag size={15} /></button>}
+                  {role === "tutor" && <button title="Задать ещё раз или другим ученикам" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => { setReassigning(h); setReassignIds(new Set([h.studentId])); }}><Repeat size={15} />Задать ещё</button>}
                   {role === "tutor" && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("homework", h.id)}><Trash2 size={15} /></button>}
                 </div>
               </div>
@@ -294,6 +309,27 @@ export default function Homework() {
           </div>
         )}
       </Modal>
+      {/* ---------- задать ещё раз / другим ученикам ---------- */}
+      <Modal open={!!reassigning} onClose={() => setReassigning(null)} title={reassigning ? `Задать ещё: «${reassigning.title}»` : ""}>
+        {reassigning && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>Выберите, кому назначить это задание заново — можно тому же ученику (повторить попытку) и/или другим. Будет создана новая копия со статусом «Выдана», старая история сохранится.</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {students.map((s) => {
+                const on = reassignIds.has(s.id);
+                const isOriginal = s.id === reassigning.studentId;
+                return (
+                  <button key={s.id} onClick={() => toggleReassign(s.id)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? T.accent : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>
+                    {s.name}{isOriginal ? " (уже был выдан)" : ""}
+                  </button>
+                );
+              })}
+            </div>
+            <button style={btn} onClick={doReassign}>Назначить выбранным ({reassignIds.size})</button>
+          </div>
+        )}
+      </Modal>
+
       {/* ---------- назначение тегов уже выданной домашке ---------- */}
       <Modal open={!!tagging} onClose={() => setTagging(null)} title={tagging ? `Теги: ${tagging.title}` : ""}>
         {tagging && (
