@@ -5,7 +5,8 @@ import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
 
 export default function Library() {
-  const { role } = useAuth();
+  const { role, profile } = useAuth();
+  const { items: users } = useCol("users");
   const { items: materials } = useCol("materials");
   const { items: tags } = useCol("tags");
   const [q, setQ] = useState("");
@@ -18,10 +19,21 @@ export default function Library() {
   const tagById = (id) => tags.find((t) => t.id === id);
   const matTagIds = (m) => m.tagIds || (m.tagId ? [m.tagId] : []); // поддержка старых записей с одним tagId
 
+  // Доступ к предметам: у ученика/родителя виден материал только по разрешённым предметам.
+  // По умолчанию (если доступ не настроен репетитором) — только основной предмет ученика.
+  const mySubjects = useMemo(() => {
+    if (role === "tutor") return null; // репетитору видно всё
+    const sid = role === "student" ? profile.uid : profile.childId;
+    const st = users.find((u) => u.id === sid);
+    if (!st) return [];
+    return st.subjectAccess && st.subjectAccess.length ? st.subjectAccess : [st.subject].filter(Boolean);
+  }, [role, profile, users]);
+
   const list = useMemo(() => materials
     .filter((m) =>
       (m.title + " " + m.subject).toLowerCase().includes(q.toLowerCase()) &&
-      (!filterTag || matTagIds(m).includes(filterTag))
+      (!filterTag || matTagIds(m).includes(filterTag)) &&
+      (mySubjects === null || mySubjects.includes(m.subject))
     )
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)),
   [q, materials, filterTag]);

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Mail, BookOpen, ClipboardList, Award, TrendingUp, Users as UsersIcon, X } from "lucide-react";
-import { Card, Modal, T, serif, sans, chip, Avatar, initials } from "../ui.jsx";
+import { Card, Modal, T, serif, sans, chip, Avatar, initials, SUBJECTS } from "../ui.jsx";
 import { CandleChart } from "../chart.jsx";
-import { useCol } from "../useDB.js";
+import { useCol, updateItem } from "../useDB.js";
 import { averagePct, computeWeakTopics } from "../grading.js";
 
 export default function Students() {
@@ -108,6 +108,26 @@ export default function Students() {
                     })}
                   </div>
                 )}
+              </div>
+
+              <div>
+                <div style={{ font: `600 14px ${sans}`, color: T.ink, marginBottom: 6 }}>Доступ к предметам библиотеки</div>
+                <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 10 }}>По умолчанию ученик видит в библиотеке материалы только своего основного предмета. Здесь можно открыть доступ и к другим.</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {SUBJECTS.map((subj) => {
+                    const current = st.subjectAccess && st.subjectAccess.length ? st.subjectAccess : [st.subject].filter(Boolean);
+                    const on = current.includes(subj);
+                    const toggle = () => {
+                      const next = on ? current.filter((x) => x !== subj) : [...current, subj];
+                      updateItem("users", st.id, { subjectAccess: next });
+                    };
+                    return (
+                      <button key={subj} onClick={toggle} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? T.accent : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>
+                        {subj}{subj === st.subject ? " (основной)" : ""}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 8, font: `13px ${sans}`, color: T.faint, borderTop: `1px solid ${T.line}`, paddingTop: 14 }}>
