@@ -4,6 +4,7 @@ import {
   CalendarDays, Calendar as CalendarIcon, Award, PencilLine, Menu, X, Bell,
   GraduationCap, User, Users, LogOut, ChevronRight, ShieldCheck,
 } from "lucide-react";
+import { Settings, UserCog } from "lucide-react";
 import { T, serif, sans, Card, Avatar, btn, input, ROLE_LABEL, initials, SUBJECTS } from "./ui.jsx";
 import { useAuth } from "./auth.jsx";
 import { useCol, setUserDoc } from "./useDB.js";
@@ -19,11 +20,14 @@ import Calendar from "./sections/Calendar.jsx";
 import Notifications from "./sections/Notifications.jsx";
 import Mocks from "./sections/Mocks.jsx";
 import Grades from "./sections/Grades.jsx";
+import SettingsPage from "./sections/Settings.jsx";
+import Profiles from "./sections/Profiles.jsx";
 
 const NAV = [
   { id: "dash", label: "Главная", Icon: LayoutGrid, roles: ["tutor", "admin", "student", "parent"] },
   { id: "students", label: "Ученики", Icon: Users, roles: ["tutor", "admin"] },
   { id: "tutors", label: "Репетиторы", Icon: ShieldCheck, roles: ["admin"] },
+  { id: "profiles", label: "Профили", Icon: UserCog, roles: ["admin"] },
   { id: "lib", label: "Библиотека", Icon: BookOpen, roles: ["tutor", "admin", "student", "parent"] },
   { id: "useful", label: "Полезное", Icon: Youtube, roles: ["tutor", "admin", "student", "parent"] },
   { id: "homework", label: "Домашка", Icon: ClipboardList, roles: ["tutor", "admin", "student", "parent"] },
@@ -32,6 +36,7 @@ const NAV = [
   { id: "notifications", label: "Уведомления", Icon: Bell, roles: ["tutor", "admin", "student", "parent"] },
   { id: "mocks", label: "Пробники", Icon: PencilLine, roles: ["tutor", "admin", "student", "parent"] },
   { id: "grades", label: "Журнал оценок", Icon: Award, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "settings", label: "Настройки", Icon: Settings, roles: ["tutor", "admin"] },
 ];
 
 const globalCss = `
@@ -56,7 +61,7 @@ input,textarea,select,button{font-family:${sans}}
 `;
 
 export default function App() {
-  const { user, profile, role, loading, logout } = useAuth();
+  const { user, profile, role, loading, logout, isImpersonating, stopImpersonate, realProfile } = useAuth();
   const [tab, setTab] = useState("dash");
   const [navOpen, setNavOpen] = useState(false);
   const { items: allUsers } = useCol("users");
@@ -104,6 +109,12 @@ export default function App() {
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        {isImpersonating && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 20px", background: "#3C0000", color: "#fff", font: `600 13px ${sans}`, flexWrap: "wrap" }}>
+            <span>Вы смотрите платформу от лица: {profile.name} ({ROLE_LABEL[profile.role]}) — это не {realProfile?.name}</span>
+            <button onClick={stopImpersonate} style={{ background: "#fff", color: T.accent, border: "none", borderRadius: 7, padding: "6px 12px", font: `600 12.5px ${sans}`, cursor: "pointer" }}>Вернуться к себе</button>
+          </div>
+        )}
         <header className="app-header" style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", padding: "18px 28px", borderBottom: `1px solid ${T.line}`, background: T.card }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button className="hamburger-btn" onClick={() => setNavOpen(true)} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 8, width: 36, height: 36, alignItems: "center", justifyContent: "center", cursor: "pointer", color: T.ink }}><Menu size={19} /></button>
@@ -114,6 +125,7 @@ export default function App() {
           {current === "dash" && <Dashboard go={setTab} />}
           {current === "students" && <Students />}
           {current === "tutors" && <Tutors />}
+          {current === "profiles" && <Profiles />}
           {current === "lib" && <Library />}
           {current === "useful" && <Useful />}
           {current === "homework" && <Homework />}
@@ -122,6 +134,7 @@ export default function App() {
           {current === "notifications" && <Notifications />}
           {current === "mocks" && <Mocks />}
           {current === "grades" && <Grades />}
+          {current === "settings" && <SettingsPage />}
         </div>
       </main>
     </div>
@@ -135,11 +148,15 @@ function Splash({ text }) {
 /* ---------- вход / регистрация ---------- */
 function Auth() {
   const { login, register } = useAuth();
+  const { items: allUsers } = useCol("users");
+  const { items: allSubjects } = useCol("subjects");
   const [mode, setMode] = useState("login");
-  const [f, setF] = useState({ name: "", email: "", password: "", role: "tutor", subject: SUBJECTS[0], code: "" });
+  const [f, setF] = useState({ name: "", email: "", password: "", role: "tutor", tutorId: "", subject: "", code: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const REGISTRATION_CODE = "ЮНОСТЬ";
+  const approvedTutors = allUsers.filter((u) => (u.role === "tutor" || u.role === "admin") && u.approved !== false);
+  const tutorSubjects = allSubjects.filter((s) => s.tutorId === f.tutorId);
 
   const submit = async () => {
     setErr(""); setBusy(true);
@@ -150,6 +167,7 @@ function Auth() {
         if ((f.role === "tutor" || f.role === "admin") && f.code.trim().toUpperCase() !== REGISTRATION_CODE) {
           throw new Error("Неверный код регистрации для этой роли");
         }
+        if (f.role === "student" && !f.tutorId) throw new Error("Выберите репетитора");
         await register(f);
       }
     } catch (e) {
@@ -188,10 +206,21 @@ function Auth() {
               <div style={{ font: `11.5px ${sans}`, color: T.faint }}>После регистрации доступ должен подтвердить действующий репетитор или администратор.</div>
             </>}
             {mode === "register" && f.role === "student" && <>
-              <div style={{ font: `12px ${sans}`, color: T.soft, marginTop: 4 }}>Какой предмет будете изучать:</div>
-              <select style={input} value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })}>
-                {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              <div style={{ font: `12px ${sans}`, color: T.soft, marginTop: 4 }}>Ваш репетитор:</div>
+              <select style={input} value={f.tutorId} onChange={(e) => setF({ ...f, tutorId: e.target.value, subject: "" })}>
+                <option value="">— выберите репетитора —</option>
+                {approvedTutors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
+              {f.tutorId && (
+                <>
+                  <div style={{ font: `12px ${sans}`, color: T.soft, marginTop: 4 }}>Какой предмет будете изучать:</div>
+                  <select style={input} value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })}>
+                    <option value="">— предмет не указан —</option>
+                    {tutorSubjects.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                  {tutorSubjects.length === 0 && <div style={{ font: `11.5px ${sans}`, color: T.faint }}>У этого репетитора пока не заведено ни одного предмета.</div>}
+                </>
+              )}
             </>}
             {err && <div style={{ font: `13px ${sans}`, color: "#a23b2d" }}>{err}</div>}
             <button style={{ ...btn, justifyContent: "center", marginTop: 6, opacity: busy ? .6 : 1 }} disabled={busy} onClick={submit}>{mode === "login" ? "Войти" : "Создать аккаунт"} <ChevronRight size={16} /></button>
@@ -204,7 +233,7 @@ function Auth() {
 
 /* ---------- ожидание подтверждения доступа (для новых репетиторов/админов) ---------- */
 function PendingApproval() {
-  const { profile, logout } = useAuth();
+  const { profile, logout, isImpersonating, stopImpersonate } = useAuth();
   return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "grid", placeItems: "center", padding: 20 }}>
       <Card style={{ padding: 32, maxWidth: 420, textAlign: "center" }}>
@@ -213,7 +242,7 @@ function PendingApproval() {
         <div style={{ font: `14px/1.6 ${sans}`, color: T.soft, marginBottom: 18 }}>
           Аккаунт «{profile.name}» ({ROLE_LABEL[profile.role]}) зарегистрирован, но доступ должен подтвердить действующий репетитор или администратор в разделе «Репетиторы». Как только подтвердят — сможете войти.
         </div>
-        <button style={btn} onClick={logout}>Выйти</button>
+        <button style={btn} onClick={isImpersonating ? stopImpersonate : logout}>{isImpersonating ? "Вернуться к себе" : "Выйти"}</button>
       </Card>
     </div>
   );
@@ -221,7 +250,7 @@ function PendingApproval() {
 
 /* ---------- родитель выбирает своего ученика ---------- */
 function LinkChild() {
-  const { profile, logout } = useAuth();
+  const { profile, logout, isImpersonating, stopImpersonate } = useAuth();
   const { items: users } = useCol("users");
   const students = users.filter((u) => u.role === "student");
   const [busy, setBusy] = useState(false);
@@ -240,7 +269,7 @@ function LinkChild() {
           ))}
           {students.length === 0 && <div style={{ font: `14px ${sans}`, color: T.faint }}>Учеников пока нет в системе. Попросите ученика сначала зарегистрироваться.</div>}
         </div>
-        <button onClick={logout} style={{ marginTop: 16, background: "none", border: "none", color: T.faint, font: `13px ${sans}`, cursor: "pointer" }}>Выйти</button>
+        <button onClick={isImpersonating ? stopImpersonate : logout} style={{ marginTop: 16, background: "none", border: "none", color: T.faint, font: `13px ${sans}`, cursor: "pointer" }}>{isImpersonating ? "Вернуться к себе" : "Выйти"}</button>
       </Card>
     </div>
   );
