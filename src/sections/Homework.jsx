@@ -6,12 +6,12 @@ import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem, notify } from "../useDB.js";
 
 // Статусы, которые репетитор может выбирать сам — видны всем ролям
-export const HW_STATUSES = ["Выдана", "Выполнена", "Проверена", "Требует доработки", "Не выполнена"];
+export const HW_STATUSES = ["Выдана", "Выполнена", "Требует проверки", "Проверена", "Требует доработки", "Не выполнена"];
 const STATUS_COLOR = {
-  "Выдана": T.line, "Выполнена": T.accentSoft, "Проверена": "#cfe0cf",
+  "Выдана": T.line, "Выполнена": T.accentSoft, "Требует проверки": "#e0c48a", "Проверена": "#cfe0cf",
   "Требует доработки": "#f0d9a6", "Не выполнена": "#e7c6c1",
 };
-const STATUS_ICON = { "Проверена": BadgeCheck, "Выполнена": CheckCircle2, "Требует доработки": RotateCcw, "Не выполнена": AlertCircle };
+const STATUS_ICON = { "Проверена": BadgeCheck, "Выполнена": CheckCircle2, "Требует проверки": Eye, "Требует доработки": RotateCcw, "Не выполнена": AlertCircle };
 
 export default function Homework() {
   const { profile, role } = useAuth();
@@ -41,6 +41,8 @@ export default function Homework() {
   const [answers, setAnswers] = useState({});
   const [viewing, setViewing] = useState(null); // просмотр текстовой сдачи (репетитор)
   const [review, setReview] = useState(null); // разбор ответов на вопросы (обе роли)
+  const [grading, setGrading] = useState(null); // домашка на ручной проверке (репетитор)
+  const [gradePoints, setGradePoints] = useState({});
 
   const scoped = sid
     ? homework.filter((h) => h.studentId === sid)
@@ -76,14 +78,37 @@ export default function Homework() {
 
   const submitQuiz = async () => {
     if (!doingQuiz) return;
-    let score = 0;
-    doingQuiz.questions.forEach((qq, i) => { if (answers[i] === qq.correct) score++; });
-    await updateItem("homework", doingQuiz.id, {
-      status: "Проверена", answers: doingQuiz.questions.map((_, i) => answers[i] ?? -1),
-      score, total: doingQuiz.questions.length, submission: submissionText, submittedAt: Date.now(),
+    const hasGraph = doingQuiz.questions.some((qq) => qq.type === "graph");
+    let score = 0, total = 0;
+    doingQuiz.questions.forEach((qq, i) => {
+      if (qq.type === "graph") return; // считается вручную репетитором
+      total++;
+      if (answers[i] === qq.correct) score++;
     });
-    await notify(doingQuiz.studentId, doingQuiz.studentName, `${doingQuiz.studentName} выполнил(а) задание «${doingQuiz.title}» — ${score}/${doingQuiz.questions.length}`, "homework_done");
+    await updateItem("homework", doingQuiz.id, {
+      status: hasGraph ? "Требует проверки" : "Проверена",
+      answers: doingQuiz.questions.map((_, i) => answers[i] ?? (doingQuiz.questions[i].type === "graph" ? "" : -1)),
+      score, total, submission: submissionText, submittedAt: Date.now(),
+    });
+    await notify(doingQuiz.studentId, doingQuiz.studentName, `${doingQuiz.studentName} выполнил(а) задание «${doingQuiz.title}»${hasGraph ? " — ожидает проверки" : ` — ${score}/${total}`}`, "homework_done");
     setDoingQuiz(null); setAnswers({}); setSubmissionText("");
+  };
+
+  const saveManualGrade = async () => {
+    if (!grading) return;
+    let manualTotal = 0, manualScore = 0;
+    grading.questions.forEach((qq, i) => {
+      if (qq.type !== "graph") return;
+      manualTotal += qq.maxPoints || 0;
+      manualScore += Number(gradePoints[i]) || 0;
+    });
+    const mcScore = grading.score || 0, mcTotal = grading.total || 0;
+    await updateItem("homework", grading.id, {
+      status: "Проверена", manualScores: gradePoints,
+      score: mcScore + manualScore, total: mcTotal + manualTotal,
+    });
+    await notify(grading.studentId, grading.studentName, `Домашнее задание проверено: «${grading.title}» — ${mcScore + manualScore}/${mcTotal + manualTotal}`, "homework_checked");
+    setGrading(null); setGradePoints({});
   };
 
   const doReassign = async () => {
@@ -176,6 +201,7 @@ export default function Homework() {
                     <input style={{ ...input, width: 90, padding: "7px 10px" }} placeholder="Оценка" id={`g-${h.id}`} defaultValue={h.grade || ""} />
                     <button style={btn} onClick={async () => { const v = document.getElementById(`g-${h.id}`).value; await updateItem("homework", h.id, { status: "Проверена", grade: v || "—" }); await notify(h.studentId, h.studentName, `Домашнее задание проверено: «${h.title}» — оценка ${v || "—"}`, "homework_checked"); }}>Принять</button>
                   </>}
+                  {role === "tutor" && h.status === "Требует проверки" && <button style={btn} onClick={() => { setGrading(h); setGradePoints(h.manualScores || {}); }}>✍️ Проверить вручную</button>}
                   {role === "tutor" && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(h)}><Tag size={15} /></button>}
                   {role === "tutor" && <button title="Задать ещё раз или другим ученикам" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => { setReassigning(h); setReassignIds(new Set([h.studentId])); }}><Repeat size={15} />Задать ещё</button>}
                   {role === "tutor" && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("homework", h.id)}><Trash2 size={15} /></button>}
@@ -267,20 +293,55 @@ export default function Homework() {
           {doingQuiz?.questions.map((qq, i) => (
             <div key={i}>
               <div style={{ font: `600 15px ${sans}`, color: T.ink, marginBottom: 10 }}>{i + 1}. {qq.q}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {qq.opts.map((o, j) => {
-                  const chosen = answers[i] === j;
-                  return (
-                    <button key={j} onClick={() => setAnswers({ ...answers, [i]: j })}
-                      style={{ textAlign: "left", padding: "11px 14px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${chosen ? T.accent : T.line}`, background: chosen ? T.accentSoft : T.cardAlt, font: `14px ${sans}`, color: T.ink }}>{o || `Вариант ${j + 1}`}</button>
-                  );
-                })}
-              </div>
+              {qq.type === "graph" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {qq.promptText && <div style={{ font: `14px/1.6 ${sans}`, color: T.soft, background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 9, padding: 12, whiteSpace: "pre-wrap" }}>{qq.promptText}</div>}
+                  {qq.imageData && <img src={qq.imageData} alt="" style={{ maxWidth: "100%", borderRadius: 9, border: `1px solid ${T.line}` }} />}
+                  <textarea style={{ ...input, minHeight: 110, resize: "vertical" }} placeholder="Развёрнутый ответ" value={answers[i] || ""} onChange={(e) => setAnswers({ ...answers, [i]: e.target.value })} />
+                  <div style={{ font: `11.5px ${sans}`, color: T.faint }}>Максимум {qq.maxPoints ?? 3} балла — проверит репетитор вручную.</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {qq.opts.map((o, j) => {
+                    const chosen = answers[i] === j;
+                    return (
+                      <button key={j} onClick={() => setAnswers({ ...answers, [i]: j })}
+                        style={{ textAlign: "left", padding: "11px 14px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${chosen ? T.accent : T.line}`, background: chosen ? T.accentSoft : T.cardAlt, font: `14px ${sans}`, color: T.ink }}>{o || `Вариант ${j + 1}`}</button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ))}
           <textarea style={{ ...input, minHeight: 70, resize: "vertical" }} placeholder="Комментарий репетитору (необязательно)" value={submissionText} onChange={(e) => setSubmissionText(e.target.value)} />
-          <button style={btn} onClick={submitQuiz}>Завершить и отправить — проверится автоматически</button>
+          <button style={btn} onClick={submitQuiz}>Завершить и отправить{doingQuiz?.questions.some((qq) => qq.type === "graph") ? "" : " — проверится автоматически"}</button>
         </div>
+      </Modal>
+
+      {/* ---------- репетитор проверяет вручную (графиковые вопросы) ---------- */}
+      <Modal open={!!grading} onClose={() => setGrading(null)} title={grading ? `Проверка: ${grading.title}` : ""} wide>
+        {grading && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>{grading.studentName}</div>
+            {grading.questions.map((qq, i) => {
+              if (qq.type !== "graph") return null;
+              const given = grading.answers?.[i];
+              return (
+                <div key={i} style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>
+                  <div style={{ font: `600 14px ${sans}`, color: T.ink, marginBottom: 8 }}>{i + 1}. {qq.q}</div>
+                  {qq.promptText && <div style={{ font: `13px/1.6 ${sans}`, color: T.faint, marginBottom: 8, whiteSpace: "pre-wrap" }}>{qq.promptText}</div>}
+                  {qq.imageData && <img src={qq.imageData} alt="" style={{ maxWidth: "100%", borderRadius: 9, marginBottom: 8 }} />}
+                  <div style={{ font: `14px/1.6 ${sans}`, color: T.ink, background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 9, padding: 12, whiteSpace: "pre-wrap", marginBottom: 8 }}>{given || "Ученик не дал ответ."}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ font: `13px ${sans}`, color: T.faint }}>Баллы (максимум {qq.maxPoints ?? 3}):</span>
+                    <input type="number" min="0" max={qq.maxPoints ?? 3} style={{ ...input, width: 70, padding: "7px 10px" }} value={gradePoints[i] ?? ""} onChange={(e) => setGradePoints({ ...gradePoints, [i]: e.target.value })} />
+                  </div>
+                </div>
+              );
+            })}
+            <button style={btn} onClick={saveManualGrade}>Сохранить проверку</button>
+          </div>
+        )}
       </Modal>
 
       {/* ---------- репетитор смотрит текстовую сдачу ---------- */}
@@ -300,6 +361,15 @@ export default function Homework() {
             <div style={{ font: `15px ${sans}`, color: T.soft }}>Результат: <b style={{ color: T.ink }}>{review.score}/{review.total}</b>{role === "tutor" ? ` · ${review.studentName}` : ""}</div>
             {review.questions.map((qq, i) => {
               const given = review.answers[i];
+              if (qq.type === "graph") {
+                return (
+                  <div key={i} style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>
+                    <div style={{ font: `600 14px ${sans}`, color: T.ink, marginBottom: 6 }}>{i + 1}. {qq.q}</div>
+                    <div style={{ font: `14px/1.6 ${sans}`, color: T.soft, whiteSpace: "pre-wrap" }}>Ответ: {given || "—"}</div>
+                    <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 4 }}>Баллы: {review.manualScores?.[i] ?? "не проверено"} из {qq.maxPoints ?? 3}</div>
+                  </div>
+                );
+              }
               const ok = given === qq.correct;
               return (
                 <div key={i} style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>
