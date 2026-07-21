@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X } from "lucide-react";
+import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X, Search } from "lucide-react";
 import { Card, Modal, T, sans, btn, btnGhost, input, chip } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
@@ -18,11 +18,14 @@ export default function Homework() {
   const { items: users } = useCol("users");
   const { items: homework } = useCol("homework");
   const { items: materials } = useCol("materials");
+  const { items: tags } = useCol("tags");
   const students = users.filter((u) => u.role === "student");
   const [add, setAdd] = useState(false);
   const [targetIds, setTargetIds] = useState(new Set());
-  const [form, setForm] = useState({ title: "", desc: "", due: "", materialId: "" });
+  const [form, setForm] = useState({ title: "", desc: "", due: "", materialId: "", tagIds: [] });
   const [qs, setQs] = useState([]); // автопроверяемые вопросы для новой домашки
+  const [q, setQ] = useState(""); // поиск
+  const [filterTag, setFilterTag] = useState(null);
 
   const [doingText, setDoingText] = useState(null); // домашка без вопросов — текстовая сдача
   const [submissionText, setSubmissionText] = useState("");
@@ -31,7 +34,12 @@ export default function Homework() {
   const [viewing, setViewing] = useState(null); // просмотр текстовой сдачи (репетитор)
   const [review, setReview] = useState(null); // разбор ответов на вопросы (обе роли)
 
-  const list = sid ? homework.filter((h) => h.studentId === sid) : homework;
+  const scoped = sid ? homework.filter((h) => h.studentId === sid) : homework;
+  const list = scoped.filter((h) =>
+    (h.title + " " + (h.desc || "") + " " + (h.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
+    (!filterTag || (h.tagIds || []).includes(filterTag))
+  );
+  const tagById = (id) => tags.find((t) => t.id === id);
 
   const toggleTarget = (id) => setTargetIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const addQ = () => setQs([...qs, { q: "", opts: ["", "", "", ""], correct: 0, topic: "" }]);
@@ -45,7 +53,7 @@ export default function Homework() {
       const st = users.find((u) => u.id === studentId);
       return addItem("homework", { ...form, studentId, studentName: st?.name || "", status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
     }));
-    setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "" }); setQs([]); setTargetIds(new Set());
+    setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]); setTargetIds(new Set());
   };
 
   const submitText = async () => {
@@ -68,12 +76,30 @@ export default function Homework() {
   return (
     <div>
       {role === "tutor" && <div style={{ marginBottom: 16 }}><button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Выдать домашку</button></div>}
+
+      <div style={{ position: "relative", marginBottom: 12 }}>
+        <Search size={17} color={T.faint} style={{ position: "absolute", left: 12, top: 11 }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по домашним заданиям…" style={{ ...input, paddingLeft: 38 }} />
+      </div>
+      {tags.length > 0 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ font: `12px ${sans}`, color: T.faint }}>Теги:</span>
+          <button onClick={() => setFilterTag(null)} style={{ ...chip, background: !filterTag ? T.accent : T.line, color: !filterTag ? "#fff" : T.soft, border: "none", cursor: "pointer" }}>Все</button>
+          {tags.map((t) => (
+            <button key={t.id} onClick={() => setFilterTag(filterTag === t.id ? null : t.id)} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...chip, background: filterTag === t.id ? t.color : T.card, color: filterTag === t.id ? "#fff" : T.ink, border: `1px solid ${filterTag === t.id ? t.color : T.line}`, cursor: "pointer" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, display: "inline-block" }} />{t.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {list.map((h) => {
           const mat = materials.find((m) => m.id === h.materialId);
           const Icon = STATUS_ICON[h.status] || Circle;
           const hasQuiz = h.questions && h.questions.length > 0;
           const alreadyAnswered = Array.isArray(h.answers);
+          const hTags = (h.tagIds || []).map(tagById).filter(Boolean);
           return (
             <Card key={h.id} style={{ padding: 16, display: "flex", gap: 14, alignItems: "flex-start" }}>
               <Icon size={26} color={h.status === "Выдана" ? T.faint : T.soft} />
@@ -84,6 +110,13 @@ export default function Homework() {
                   {alreadyAnswered && <span style={chip}>{h.score}/{h.total} верно</span>}
                   {h.grade && <span style={chip}>Оценка: {h.grade}</span>}
                 </div>
+                {hTags.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                    {hTags.map((t) => (
+                      <span key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, font: `11px ${sans}`, color: T.faint }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: t.color }} />{t.name}</span>
+                    ))}
+                  </div>
+                )}
                 {role === "tutor" && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{h.studentName}</div>}
                 {h.desc && <div style={{ font: `14px/1.5 ${sans}`, color: T.soft, marginTop: 6 }}>{h.desc}</div>}
                 <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>срок: {h.due || "—"}{mat ? ` · материал: ${mat.title}` : ""}</div>
@@ -97,6 +130,7 @@ export default function Homework() {
                   ) : (
                     <span style={{ ...chip, background: STATUS_COLOR[h.status], color: T.ink }}>{h.status}</span>
                   )}
+
 
                   {role === "student" && hasQuiz && (h.status === "Выдана" || h.status === "Требует доработки") &&
                     <button style={btn} onClick={() => { setDoingQuiz(h); setAnswers({}); setSubmissionText(h.submission || ""); }}>{h.status === "Требует доработки" ? "Пройти заново" : "Пройти задание"}</button>}
@@ -140,6 +174,22 @@ export default function Homework() {
               {materials.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
           </div>
+          {tags.length > 0 && (
+            <div>
+              <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Теги</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {tags.map((t) => {
+                  const on = form.tagIds.includes(t.id);
+                  const toggle = () => setForm({ ...form, tagIds: on ? form.tagIds.filter((x) => x !== t.id) : [...form.tagIds, t.id] });
+                  return (
+                    <button key={t.id} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? t.color : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink }}>
+                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: t.color }} />{t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>
             <div style={{ font: `600 13px ${sans}`, color: T.ink, marginBottom: 4 }}>Вопросы теста (автопроверка, необязательно)</div>
