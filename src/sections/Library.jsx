@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Search, Plus, FileText, Link2, Settings2, Trash2, Pin, PinOff } from "lucide-react";
-import { Card, Modal, T, sans, btn, btnGhost, input, chip, TAG_PALETTE } from "../ui.jsx";
+import { Card, Modal, T, sans, btn, btnGhost, input, chip, TAG_PALETTE, SUBJECTS } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
 
@@ -129,7 +129,7 @@ export default function Library() {
           <input style={input} placeholder="Название" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <div style={{ display: "flex", gap: 10 }}>
             <select style={input} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>
-              {["Обществознание", "История", "Английский", "Математика", "Другое"].map((s) => <option key={s}>{s}</option>)}
+              {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
             </select>
             <select style={input} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
               {["Конспект", "PDF", "Презентация"].map((s) => <option key={s}>{s}</option>)}
