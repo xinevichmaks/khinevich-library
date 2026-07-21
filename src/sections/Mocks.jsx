@@ -22,12 +22,17 @@ function blankQuestion(type) {
 
 export default function Mocks() {
   const { profile, role } = useAuth();
+  const isStaff = role === "tutor" || role === "admin";
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
   const { items: users } = useCol("users");
   const { items: mocks } = useCol("mocks");
-  const { items: tags } = useCol("mockTags");
-  const students = users.filter((u) => u.role === "student");
-  const scoped = sid ? mocks.filter((m) => m.studentId === sid) : mocks;
+  const { items: allTags } = useCol("mockTags");
+  const students = users.filter((u) => u.role === "student" && (role === "admin" || u.tutorId === profile.uid));
+  const myTutorId = isStaff ? profile.uid : users.find((u) => u.id === sid)?.tutorId;
+  const tags = isStaff ? allTags.filter((t) => t.tutorId === profile.uid) : allTags.filter((t) => t.tutorId === myTutorId);
+  const scoped = sid
+    ? mocks.filter((m) => m.studentId === sid)
+    : (role === "admin" ? mocks : mocks.filter((m) => m.tutorId === profile.uid));
   const [q, setQ] = useState("");
   const [filterTag, setFilterTag] = useState(null);
   const [tagManager, setTagManager] = useState(false);
@@ -36,7 +41,7 @@ export default function Mocks() {
     (m.title + " " + (m.subject || "") + " " + (m.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
     (!filterTag || (m.tagIds || []).includes(filterTag))
   );
-  const tagById = (id) => tags.find((t) => t.id === id);
+  const tagById = (id) => allTags.find((t) => t.id === id);
 
   const [add, setAdd] = useState(false);
   const [targetIds, setTargetIds] = useState(new Set());
@@ -75,7 +80,7 @@ export default function Mocks() {
     const cleanQs = qs.filter((q) => q.q.trim());
     await Promise.all([...targetIds].map((studentId) => {
       const st = users.find((u) => u.id === studentId);
-      return addItem("mocks", { ...form, studentId, studentName: st?.name || "", status: "Ожидает", questions: JSON.parse(JSON.stringify(cleanQs)) });
+      return addItem("mocks", { ...form, studentId, studentName: st?.name || "", tutorId: profile.uid, status: "Ожидает", questions: JSON.parse(JSON.stringify(cleanQs)) });
     }));
     setAdd(false); setForm({ title: "", subject: "", date: "" }); setQs([]); setTargetIds(new Set());
   };
@@ -465,18 +470,18 @@ export default function Mocks() {
 
       {/* ---------- менеджер тегов пробников (отдельно от библиотеки и домашки) ---------- */}
       <Modal open={tagManager} onClose={() => setTagManager(false)} title="Теги пробников" wide>
-        <MockTagManager tags={tags} />
+        <MockTagManager tags={tags} tutorId={profile.uid} />
       </Modal>
     </div>
   );
 }
 
-function MockTagManager({ tags }) {
+function MockTagManager({ tags, tutorId }) {
   const [name, setName] = useState("");
   const [colorIdx, setColorIdx] = useState(0);
   const addTag = async () => {
     if (!name.trim()) return;
-    await addItem("mockTags", { name: name.trim(), color: TAG_PALETTE[colorIdx] });
+    await addItem("mockTags", { name: name.trim(), color: TAG_PALETTE[colorIdx], tutorId });
     setName(""); setColorIdx(0);
   };
   return (

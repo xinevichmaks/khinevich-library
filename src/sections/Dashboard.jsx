@@ -56,7 +56,7 @@ export default function Dashboard({ go }) {
   const { items: schedule } = useCol("schedule");
   const { items: mocks } = useCol("mocks");
 
-  const scoped = (arr) => (sid ? arr.filter((x) => x.studentId === sid) : arr);
+  const scoped = (arr) => (sid ? arr.filter((x) => x.studentId === sid) : (role === "admin" ? arr : arr.filter((x) => x.tutorId === profile.uid)));
   const myProfile = sid ? users.find((u) => u.id === sid) : null;
 
   const myHw = useMemo(() => scoped(homework).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)), [homework, sid]);
@@ -77,7 +77,7 @@ export default function Dashboard({ go }) {
 
   // Ожидающая домашка — до 5 записей, невыполненные сначала
   const pendingHw = useMemo(() => {
-    const src = role === "tutor" ? homework : myHw;
+    const src = role === "tutor" ? scoped(homework) : role === "admin" ? homework : myHw;
     return [...src].sort((a, b) => (a.status === "Проверена" ? 1 : 0) - (b.status === "Проверена" ? 1 : 0)).slice(0, 5);
   }, [homework, myHw, role]);
 
@@ -104,8 +104,8 @@ export default function Dashboard({ go }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         {role === "tutor" && <>
-          <Stat label="Занятий" val={schedule.length} Icon={CalendarDays} />
-          <Stat label="Домашек выдано" val={homework.length} Icon={BookOpen} sub={`${homework.filter((h) => h.status !== "Выдана").length} сданы`} />
+          <Stat label="Занятий" val={scoped(schedule).length} Icon={CalendarDays} />
+          <Stat label="Домашек выдано" val={scoped(homework).length} Icon={BookOpen} sub={`${scoped(homework).filter((h) => h.status !== "Выдана").length} сданы`} />
         </>}
         {role !== "tutor" && <>
           <Stat label="Занятий проведено" val={doneLessons} Icon={Wallet} sub={myProfile?.paidLessons ? `из ${myProfile.paidLessons} оплаченных` : undefined} />
@@ -138,7 +138,7 @@ export default function Dashboard({ go }) {
         <div style={{ font: `11.5px ${sans}`, color: T.faint, marginTop: 6 }}>зелёная свеча — балл вырос к предыдущему, красная — снизился · шкала: 5→100%, 4→80%, 3→60%, 2→40%, либо балл из максимума</div>
       </Card>
 
-      <WeakTopics sid={sid} homework={homework} mocks={mocks} tutorView={role === "tutor"} />
+      <WeakTopics sid={sid} homework={scoped(homework)} mocks={scoped(mocks)} tutorView={role === "tutor"} />
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 18 }}>
         <MonthCalendar title="Занятия" markedDates={lessonDays} color={T.down} legend="занятие" />

@@ -15,12 +15,15 @@ const STATUS_ICON = { "Проверена": BadgeCheck, "Выполнена": Ch
 
 export default function Homework() {
   const { profile, role } = useAuth();
+  const isStaff = role === "tutor" || role === "admin";
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
   const { items: users } = useCol("users");
   const { items: homework } = useCol("homework");
   const { items: materials } = useCol("materials");
-  const { items: tags } = useCol("hwTags");
-  const students = users.filter((u) => u.role === "student");
+  const { items: allTags } = useCol("hwTags");
+  const students = users.filter((u) => u.role === "student" && (role === "admin" || u.tutorId === profile.uid));
+  const myTutorId = isStaff ? profile.uid : users.find((u) => u.id === sid)?.tutorId;
+  const tags = isStaff ? allTags.filter((t) => t.tutorId === profile.uid) : allTags.filter((t) => t.tutorId === myTutorId);
   const [add, setAdd] = useState(false);
   const [targetIds, setTargetIds] = useState(new Set());
   const [form, setForm] = useState({ title: "", desc: "", due: "", materialId: "", tagIds: [] });
@@ -39,12 +42,14 @@ export default function Homework() {
   const [viewing, setViewing] = useState(null); // просмотр текстовой сдачи (репетитор)
   const [review, setReview] = useState(null); // разбор ответов на вопросы (обе роли)
 
-  const scoped = sid ? homework.filter((h) => h.studentId === sid) : homework;
+  const scoped = sid
+    ? homework.filter((h) => h.studentId === sid)
+    : (role === "admin" ? homework : homework.filter((h) => h.tutorId === profile.uid));
   const list = scoped.filter((h) =>
     (h.title + " " + (h.desc || "") + " " + (h.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
     (!filterTag || (h.tagIds || []).includes(filterTag))
   );
-  const tagById = (id) => tags.find((t) => t.id === id);
+  const tagById = (id) => allTags.find((t) => t.id === id);
 
   const toggleTarget = (id) => setTargetIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const addQ = () => setQs([...qs, { q: "", opts: ["", "", "", ""], correct: 0, topic: "" }]);
@@ -56,7 +61,7 @@ export default function Homework() {
     const cleanQs = qs.filter((q) => q.q.trim());
     await Promise.all([...targetIds].map(async (studentId) => {
       const st = users.find((u) => u.id === studentId);
-      await addItem("homework", { ...form, studentId, studentName: st?.name || "", status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
+      await addItem("homework", { ...form, studentId, studentName: st?.name || "", tutorId: profile.uid, status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
       await notify(studentId, st?.name || "", `Новое домашнее задание: «${form.title}»`, "new_homework");
     }));
     setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]); setTargetIds(new Set());
@@ -86,7 +91,7 @@ export default function Homework() {
     const { id, createdAt, studentId, studentName, status, score, total, answers, submission, submittedAt, grade, ...rest } = reassigning;
     await Promise.all([...reassignIds].map(async (sid2) => {
       const st = users.find((u) => u.id === sid2);
-      await addItem("homework", { ...rest, studentId: sid2, studentName: st?.name || "", status: "Выдана" });
+      await addItem("homework", { ...rest, studentId: sid2, studentName: st?.name || "", tutorId: profile.uid, status: "Выдана" });
       await notify(sid2, st?.name || "", `Новое домашнее задание: «${reassigning.title}»`, "new_homework");
     }));
     setReassigning(null); setReassignIds(new Set());
@@ -357,18 +362,18 @@ export default function Homework() {
 
       {/* ---------- менеджер тегов домашки (отдельно от тегов библиотеки) ---------- */}
       <Modal open={tagManager} onClose={() => setTagManager(false)} title="Теги домашних заданий" wide>
-        <HwTagManager tags={tags} />
+        <HwTagManager tags={tags} tutorId={profile.uid} />
       </Modal>
     </div>
   );
 }
 
-function HwTagManager({ tags }) {
+function HwTagManager({ tags, tutorId }) {
   const [name, setName] = useState("");
   const [colorIdx, setColorIdx] = useState(0);
   const addTag = async () => {
     if (!name.trim()) return;
-    await addItem("hwTags", { name: name.trim(), color: TAG_PALETTE[colorIdx] });
+    await addItem("hwTags", { name: name.trim(), color: TAG_PALETTE[colorIdx], tutorId });
     setName(""); setColorIdx(0);
   };
   return (

@@ -26,7 +26,7 @@ export default function Notes() {
   const myTutorId = isStaff ? profile.uid : users.find((u) => u.id === sid)?.tutorId;
   const students = users.filter((u) => u.role === "student" && u.tutorId === profile.uid);
 
-  const list = notes.filter((n) => isStaff ? n.tutorId === profile.uid : (n.tutorId === myTutorId && (!n.studentId || n.studentId === sid)));
+  const list = notes.filter((n) => role === "admin" ? true : isStaff ? n.tutorId === profile.uid : (n.tutorId === myTutorId && (!n.studentId || n.studentId === sid)));
 
   const save = async () => {
     if (!form.text.trim()) return;

@@ -30,7 +30,7 @@ export default function Grades() {
   const { items: grades } = useCol("grades");
   const { items: mocks } = useCol("mocks");
 
-  const students = users.filter((u) => u.role === "student");
+  const students = users.filter((u) => u.role === "student" && (role === "admin" || u.tutorId === profile.uid));
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
   const shown = sid ? students.filter((s) => s.id === sid) : students;
 
@@ -40,7 +40,7 @@ export default function Grades() {
   const saveGrade = async () => {
     if (!form.title || !form.value) return;
     const st = users.find((u) => u.id === add);
-    await addItem("grades", { studentId: add, studentName: st?.name || "", ...form, when: new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) });
+    await addItem("grades", { studentId: add, studentName: st?.name || "", tutorId: profile.uid, ...form, when: new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) });
     await notify(add, st?.name || "", `Новая оценка: ${form.value}${form.max ? "/" + form.max : ""} — «${form.title}»`, "new_grade");
     setAdd(null); setForm({ subject: "", title: "", value: "", max: "", comment: "" });
   };

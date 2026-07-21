@@ -18,20 +18,22 @@ export default function Schedule() {
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
   const { items: users } = useCol("users");
   const { items: schedule } = useCol("schedule");
-  const students = users.filter((u) => u.role === "student");
+  const students = users.filter((u) => u.role === "student" && (role === "admin" || u.tutorId === profile.uid));
   const [linked, setLinked] = useState(false);
   const [add, setAdd] = useState(false);
   const [move, setMove] = useState(null); // занятие, которое переносим
   const [moveForm, setMoveForm] = useState({ date: "", time: "" });
   const [form, setForm] = useState({ studentId: "", topic: "", date: "", time: "" });
 
-  const list = (sid ? schedule.filter((l) => l.studentId === sid) : schedule)
-    .slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const list = (sid
+    ? schedule.filter((l) => l.studentId === sid)
+    : (role === "admin" ? schedule : schedule.filter((l) => l.tutorId === profile.uid))
+  ).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
   const save = async () => {
     if (!form.studentId || !form.topic) return;
     const st = users.find((u) => u.id === form.studentId);
-    await addItem("schedule", { ...form, studentName: st?.name || "", status: "planned" });
+    await addItem("schedule", { ...form, studentName: st?.name || "", tutorId: profile.uid, status: "planned" });
     setAdd(false); setForm({ studentId: "", topic: "", date: "", time: "" });
   };
 

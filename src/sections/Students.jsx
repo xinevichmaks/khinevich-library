@@ -7,7 +7,7 @@ import { useCol, updateItem, removeItem } from "../useDB.js";
 import { averagePct, computeWeakTopics } from "../grading.js";
 
 export default function Students() {
-  const { role } = useAuth();
+  const { role, profile } = useAuth();
   const { items: users } = useCol("users");
   const { items: homework } = useCol("homework");
   const { items: grades } = useCol("grades");
@@ -15,7 +15,7 @@ export default function Students() {
   const { items: schedule } = useCol("schedule");
   const [open, setOpen] = useState(null);
 
-  const students = users.filter((u) => u.role === "student");
+  const students = users.filter((u) => u.role === "student" && (role === "admin" || u.tutorId === profile.uid));
   const parentOf = (sid) => users.find((u) => u.role === "parent" && u.childId === sid);
 
   const statsFor = (sid) => {

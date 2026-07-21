@@ -8,6 +8,7 @@ import { useCol } from "../useDB.js";
 export default function CalendarPage() {
   const { profile, role } = useAuth();
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
+  const { items: users } = useCol("users");
   const { items: schedule } = useCol("schedule");
   const { items: mocks } = useCol("mocks");
   const { items: homework } = useCol("homework");
@@ -16,8 +17,11 @@ export default function CalendarPage() {
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const scoped = (arr) => (sid ? arr.filter((x) => x.studentId === sid) : arr);
-  const scopedNotes = sid ? notes.filter((n) => !n.studentId || n.studentId === sid) : notes;
+  const myTutorId = sid ? users.find((u) => u.id === sid)?.tutorId : null;
+  const scoped = (arr) => (sid ? arr.filter((x) => x.studentId === sid) : (role === "admin" ? arr : arr.filter((x) => x.tutorId === profile.uid)));
+  const scopedNotes = sid
+    ? notes.filter((n) => n.tutorId === myTutorId && (!n.studentId || n.studentId === sid))
+    : (role === "admin" ? notes : notes.filter((n) => n.tutorId === profile.uid));
 
   const lessonDates = scoped(schedule).filter((l) => l.status !== "cancelled").map((l) => l.date).filter(Boolean);
   const mockDates = scoped(mocks).map((m) => m.date).filter(Boolean);
