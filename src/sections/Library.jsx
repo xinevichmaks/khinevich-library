@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Plus, FileText, Link2, Settings2, Trash2 } from "lucide-react";
+import { Search, Plus, FileText, Link2, Settings2, Trash2, Pin, PinOff } from "lucide-react";
 import { Card, Modal, T, sans, btn, btnGhost, input, chip, TAG_PALETTE } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
@@ -13,20 +13,26 @@ export default function Library() {
   const [view, setView] = useState(null);
   const [add, setAdd] = useState(false);
   const [tagSettings, setTagSettings] = useState(false);
-  const [form, setForm] = useState({ title: "", subject: "Обществознание", type: "Конспект", body: "", link: "", tagId: "" });
+  const [form, setForm] = useState({ title: "", subject: "Обществознание", type: "Конспект", body: "", link: "", tagIds: [] });
 
   const tagById = (id) => tags.find((t) => t.id === id);
+  const matTagIds = (m) => m.tagIds || (m.tagId ? [m.tagId] : []); // поддержка старых записей с одним tagId
 
-  const list = useMemo(() => materials.filter((m) =>
-    (m.title + " " + m.subject).toLowerCase().includes(q.toLowerCase()) &&
-    (!filterTag || m.tagId === filterTag)
-  ), [q, materials, filterTag]);
+  const list = useMemo(() => materials
+    .filter((m) =>
+      (m.title + " " + m.subject).toLowerCase().includes(q.toLowerCase()) &&
+      (!filterTag || matTagIds(m).includes(filterTag))
+    )
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)),
+  [q, materials, filterTag]);
 
   const save = async () => {
     if (!form.title) return;
-    await addItem("materials", { ...form, date: new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) });
-    setAdd(false); setForm({ title: "", subject: "Обществознание", type: "Конспект", body: "", link: "", tagId: "" });
+    await addItem("materials", { ...form, pinned: false, date: new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) });
+    setAdd(false); setForm({ title: "", subject: "Обществознание", type: "Конспект", body: "", link: "", tagIds: [] });
   };
+  const togglePin = (m) => updateItem("materials", m.id, { pinned: !m.pinned });
+  const deleteMaterial = (m) => { if (confirm(`Удалить «${m.title}» из библиотеки?`)) removeItem("materials", m.id); };
 
   return (
     <div>
@@ -51,18 +57,33 @@ export default function Library() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 14 }}>
         {list.map((m) => {
-          const t = tagById(m.tagId);
+          const mTags = matTagIds(m).map(tagById).filter(Boolean);
           return (
-            <Card key={m.id} style={{ padding: 16, cursor: "pointer", position: "relative" }}>
-              {t && <span title={t.name} style={{ position: "absolute", top: 14, right: 14, width: 11, height: 11, borderRadius: "50%", background: t.color }} />}
-              <div onClick={() => setView(m)} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Card key={m.id} style={{ padding: 16, position: "relative", border: m.pinned ? `1.5px solid ${T.accent}` : undefined }}>
+              <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 4 }}>
+                {role === "tutor" && (
+                  <>
+                    <button title={m.pinned ? "Открепить" : "Закрепить"} onClick={() => togglePin(m)} style={{ background: "none", border: "none", cursor: "pointer", color: m.pinned ? T.accent : T.faint, padding: 3 }}>
+                      {m.pinned ? <Pin size={15} fill={T.accent} /> : <Pin size={15} />}
+                    </button>
+                    <button title="Удалить" onClick={() => deleteMaterial(m)} style={{ background: "none", border: "none", cursor: "pointer", color: T.faint, padding: 3 }}><Trash2 size={15} /></button>
+                  </>
+                )}
+              </div>
+              <div onClick={() => setView(m)} style={{ display: "flex", flexDirection: "column", gap: 9, cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", paddingRight: role === "tutor" ? 46 : 0 }}>
                   <FileText size={20} color={T.accent} />
                   <span style={chip}>{m.type}</span>
                 </div>
                 <div style={{ font: `600 15px ${sans}`, color: T.ink, lineHeight: 1.3 }}>{m.title}</div>
                 <div style={{ font: `12px ${sans}`, color: T.faint }}>{m.subject} · {m.date}</div>
-                {t && <div style={{ display: "inline-flex", alignItems: "center", gap: 5, font: `11px ${sans}`, color: T.faint }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: t.color }} />{t.name}</div>}
+                {mTags.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {mTags.map((t) => (
+                      <div key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, font: `11px ${sans}`, color: T.faint }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: t.color }} />{t.name}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             </Card>
           );
@@ -73,14 +94,20 @@ export default function Library() {
       <Modal open={!!view} onClose={() => setView(null)} title={view?.title}>
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
           <span style={chip}>{view?.type}</span><span style={chip}>{view?.subject}</span>
-          {view && tagById(view.tagId) && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, ...chip }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: tagById(view.tagId).color }} />{tagById(view.tagId).name}</span>}
+          {view && matTagIds(view).map(tagById).filter(Boolean).map((t) => (
+            <span key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, ...chip }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: t.color }} />{t.name}</span>
+          ))}
         </div>
         {view?.link && <a href={view.link} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, font: `600 14px ${sans}`, color: T.accent, marginBottom: 12 }}><Link2 size={15} />Открыть файл</a>}
         <p style={{ font: `15px/1.7 ${sans}`, color: T.ink, whiteSpace: "pre-wrap" }}>{view?.body}</p>
         {role === "tutor" && view && (
           <div style={{ borderTop: `1px solid ${T.line}`, marginTop: 14, paddingTop: 14 }}>
-            <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Изменить тег:</div>
-            <TagPicker value={view.tagId} tags={tags} onChange={(id) => { updateItem("materials", view.id, { tagId: id }); setView({ ...view, tagId: id }); }} />
+            <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Теги (до двух):</div>
+            <TagPicker value={matTagIds(view)} tags={tags} onChange={(ids) => { updateItem("materials", view.id, { tagIds: ids }); setView({ ...view, tagIds: ids }); }} />
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button style={btnGhost} onClick={() => { togglePin(view); setView({ ...view, pinned: !view.pinned }); }}>{view.pinned ? <PinOff size={15} /> : <Pin size={15} />}{view.pinned ? "Открепить" : "Закрепить"}</button>
+              <button style={{ ...btnGhost, color: "#a23b2d" }} onClick={() => { deleteMaterial(view); setView(null); }}><Trash2 size={15} />Удалить материал</button>
+            </div>
           </div>
         )}
       </Modal>
@@ -99,8 +126,8 @@ export default function Library() {
           <textarea style={{ ...input, minHeight: 110, resize: "vertical" }} placeholder="Текст конспекта / описание" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
           <input style={input} placeholder="Ссылка на файл (Google Drive / PDF) — необязательно" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
           <div>
-            <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Категория (тег)</div>
-            <TagPicker value={form.tagId} tags={tags} onChange={(id) => setForm({ ...form, tagId: id })} />
+            <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Теги (до двух)</div>
+            <TagPicker value={form.tagIds} tags={tags} onChange={(ids) => setForm({ ...form, tagIds: ids })} />
           </div>
           <button style={btn} onClick={save}>Сохранить в библиотеку</button>
         </div>
@@ -114,14 +141,24 @@ export default function Library() {
 }
 
 function TagPicker({ value, tags, onChange }) {
+  const toggle = (id) => {
+    if (value.includes(id)) { onChange(value.filter((x) => x !== id)); return; }
+    if (value.length >= 2) { onChange([value[1], id]); return; } // сдвигаем окно из двух тегов
+    onChange([...value, id]);
+  };
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      <button onClick={() => onChange("")} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${!value ? T.accent : T.line}`, background: !value ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink }}>Без тега</button>
-      {tags.map((t) => (
-        <button key={t.id} onClick={() => onChange(t.id)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${value === t.id ? t.color : T.line}`, background: value === t.id ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink }}>
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: t.color }} />{t.name}
-        </button>
-      ))}
+    <div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {tags.map((t) => {
+          const on = value.includes(t.id);
+          return (
+            <button key={t.id} onClick={() => toggle(t.id)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? t.color : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: t.color }} />{t.name}
+            </button>
+          );
+        })}
+      </div>
+      {value.length >= 2 && <div style={{ font: `11.5px ${sans}`, color: T.faint, marginTop: 6 }}>Выбрано максимум тегов (2) — выбор нового заменит самый ранний.</div>}
     </div>
   );
 }
@@ -138,7 +175,7 @@ function TagManager({ tags }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ font: `13px ${sans}`, color: T.faint }}>Создавайте свои теги и назначайте любой из 15 цветов — как метки в Finder на Mac, без ограничения по количеству.</div>
+      <div style={{ font: `13px ${sans}`, color: T.faint }}>Создавайте свои теги и назначайте любой из 15 цветов — как метки в Finder на Mac, без ограничения по количеству. У каждого материала может быть до двух тегов.</div>
       {tags.map((t) => (
         <div key={t.id} style={{ padding: "10px 0", borderBottom: `1px solid ${T.line}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>

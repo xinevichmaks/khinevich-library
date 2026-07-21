@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  LayoutGrid, BookOpen, Youtube, ClipboardList, PenLine, Video,
-  MessageSquare, CalendarDays, Award, PencilLine,
+  LayoutGrid, BookOpen, Youtube, ClipboardList, PenLine,
+  CalendarDays, Award, PencilLine, Menu, X,
   GraduationCap, User, Users, LogOut, ChevronRight,
 } from "lucide-react";
 import { T, serif, sans, Card, Avatar, btn, input, ROLE_LABEL, initials, SUBJECTS } from "./ui.jsx";
@@ -12,9 +12,6 @@ import Dashboard from "./sections/Dashboard.jsx";
 import Library from "./sections/Library.jsx";
 import Useful from "./sections/Useful.jsx";
 import Homework from "./sections/Homework.jsx";
-import Whiteboard from "./sections/Whiteboard.jsx";
-import Calls from "./sections/Calls.jsx";
-import Chat from "./sections/Chat.jsx";
 import Schedule from "./sections/Schedule.jsx";
 import Mocks from "./sections/Mocks.jsx";
 import Grades from "./sections/Grades.jsx";
@@ -24,19 +21,36 @@ const NAV = [
   { id: "lib", label: "Библиотека", Icon: BookOpen, roles: ["tutor", "student", "parent"] },
   { id: "useful", label: "Полезное", Icon: Youtube, roles: ["tutor", "student", "parent"] },
   { id: "homework", label: "Домашка", Icon: ClipboardList, roles: ["tutor", "student", "parent"] },
-  { id: "board", label: "Доска", Icon: PenLine, roles: ["tutor", "student"] },
-  { id: "calls", label: "Связь", Icon: Video, roles: ["tutor", "student"] },
-  { id: "chat", label: "Чат", Icon: MessageSquare, roles: ["tutor", "student", "parent"] },
   { id: "sched", label: "Расписание", Icon: CalendarDays, roles: ["tutor", "student", "parent"] },
   { id: "mocks", label: "Пробники", Icon: PencilLine, roles: ["tutor", "student", "parent"] },
   { id: "grades", label: "Журнал оценок", Icon: Award, roles: ["tutor", "student", "parent"] },
 ];
 
-const globalCss = `*{box-sizing:border-box} body{margin:0} ::-webkit-scrollbar{width:9px;height:9px} ::-webkit-scrollbar-thumb{background:${T.lineDk};border-radius:9px} button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid ${T.accent};outline-offset:1px} input,textarea,select,button{font-family:${sans}}`;
+const globalCss = `
+*{box-sizing:border-box} body{margin:0}
+::-webkit-scrollbar{width:9px;height:9px} ::-webkit-scrollbar-thumb{background:${T.lineDk};border-radius:9px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid ${T.accent};outline-offset:1px}
+input,textarea,select,button{font-family:${sans}}
+.hamburger-btn{display:none}
+.mobile-overlay{display:none}
+@media (max-width: 900px){
+  .app-aside{position:fixed !important; top:0; left:0; height:100dvh !important; z-index:60; width:min(80vw,280px) !important; transform:translateX(-105%); transition:transform .22s ease;}
+  .app-aside.open{transform:translateX(0);}
+  .hamburger-btn{display:inline-flex !important;}
+  .mobile-overlay.show{display:block; position:fixed; inset:0; background:rgba(20,10,10,.45); z-index:50;}
+  .app-header{padding:14px 16px !important;}
+  .app-content{padding:16px !important;}
+  .app-header h1{font-size:19px !important;}
+}
+@media (min-width: 901px) and (max-width: 1180px){
+  .app-aside{width:190px !important;}
+}
+`;
 
 export default function App() {
   const { user, profile, role, loading, logout } = useAuth();
   const [tab, setTab] = useState("dash");
+  const [navOpen, setNavOpen] = useState(false);
 
   if (loading) return <Splash text="Загрузка…" />;
   if (!user || !profile) return <><style>{globalCss}</style><Auth /></>;
@@ -44,21 +58,24 @@ export default function App() {
 
   const nav = NAV.filter((n) => n.roles.includes(role));
   const current = nav.find((n) => n.id === tab) ? tab : "dash";
+  const goTab = (id) => { setTab(id); setNavOpen(false); };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: T.bg, color: T.ink }}>
       <style>{globalCss}</style>
-      <aside style={{ width: 230, background: T.sidebar, borderRight: `1px solid ${T.sidebarLine}`, padding: "20px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
+      <div className={`mobile-overlay${navOpen ? " show" : ""}`} onClick={() => setNavOpen(false)} />
+      <aside className={`app-aside${navOpen ? " open" : ""}`} style={{ width: 230, background: T.sidebar, borderRight: `1px solid ${T.sidebarLine}`, padding: "20px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 18px" }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: T.ink, display: "grid", placeItems: "center" }}><PenLine size={18} color="#fff" /></div>
-          <div>
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: T.ink, display: "grid", placeItems: "center", flexShrink: 0 }}><PenLine size={18} color="#fff" /></div>
+          <div style={{ flex: 1 }}>
             <div style={{ font: `700 17px ${serif}`, color: "#fff", lineHeight: 1.15 }}>Khinevich<br />Library</div>
             <div style={{ font: `11px ${sans}`, color: "rgba(255,255,255,.65)" }}>кабинет репетитора</div>
           </div>
+          <button className="hamburger-btn" onClick={() => setNavOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,.8)" }}><X size={20} /></button>
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 3, overflow: "auto" }}>
           {nav.map(({ id, label, Icon }) => (
-            <button key={id} onClick={() => setTab(id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", background: current === id ? T.accent : "transparent", color: current === id ? "#fff" : "rgba(255,255,255,.78)", font: `600 14px ${sans}`, textAlign: "left" }}><Icon size={18} />{label}</button>
+            <button key={id} onClick={() => goTab(id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", background: current === id ? T.accent : "transparent", color: current === id ? "#fff" : "rgba(255,255,255,.78)", font: `600 14px ${sans}`, textAlign: "left" }}><Icon size={18} />{label}</button>
           ))}
         </nav>
         <div style={{ marginTop: "auto", paddingTop: 12, borderTop: `1px solid ${T.sidebarLine}`, display: "flex", alignItems: "center", gap: 10 }}>
@@ -72,17 +89,17 @@ export default function App() {
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 28px", borderBottom: `1px solid ${T.line}`, background: T.card }}>
-          <h1 style={{ margin: 0, font: `700 24px ${serif}`, color: T.ink }}>{nav.find((n) => n.id === current)?.label}</h1>
+        <header className="app-header" style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", padding: "18px 28px", borderBottom: `1px solid ${T.line}`, background: T.card }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button className="hamburger-btn" onClick={() => setNavOpen(true)} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 8, width: 36, height: 36, alignItems: "center", justifyContent: "center", cursor: "pointer", color: T.ink }}><Menu size={19} /></button>
+            <h1 style={{ margin: 0, font: `700 24px ${serif}`, color: T.ink }}>{nav.find((n) => n.id === current)?.label}</h1>
+          </div>
         </header>
-        <div style={{ padding: 28, flex: 1, overflow: "auto" }}>
+        <div className="app-content" style={{ padding: 28, flex: 1, overflow: "auto" }}>
           {current === "dash" && <Dashboard go={setTab} />}
           {current === "lib" && <Library />}
           {current === "useful" && <Useful />}
           {current === "homework" && <Homework />}
-          {current === "board" && <Whiteboard />}
-          {current === "calls" && <Calls />}
-          {current === "chat" && <Chat />}
           {current === "sched" && <Schedule />}
           {current === "mocks" && <Mocks />}
           {current === "grades" && <Grades />}

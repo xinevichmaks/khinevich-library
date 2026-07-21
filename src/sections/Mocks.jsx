@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, Trash2, ListChecks, Check, X, Eye } from "lucide-react";
 import { Card, Modal, T, sans, btn, btnGhost, input, chip } from "../ui.jsx";
+import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
 
@@ -136,7 +137,7 @@ export default function Mocks() {
                 <span style={{ ...chip, background: statusBg }}>{m.status}</span>
               </div>
               {role === "tutor" && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{m.studentName}</div>}
-              <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>дата: {m.date || "—"}</div>
+              <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>дата: {fmtDateRu(m.date) || "—"}</div>
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 {role === "student" && !answered && <button style={btn} onClick={() => { setTaking(m); setAnswers({}); }}>Пройти пробник</button>}
                 {answered && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setReview(m)}><ListChecks size={15} />Разбор ответов</button>}
@@ -164,7 +165,7 @@ export default function Mocks() {
           <input style={input} placeholder="Название пробника" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <div style={{ display: "flex", gap: 10 }}>
             <input style={input} placeholder="Предмет" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
-            <input style={input} placeholder="Дата (напр. 5 авг)" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <DatePicker value={form.date} onChange={(d) => setForm({ ...form, date: d })} />
           </div>
 
           <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>

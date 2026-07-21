@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CalendarDays, Plus, Trash2, Wallet, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, Modal, T, serif, sans, btn, btnGhost, input, chip, iconBtn, Avatar, initials } from "../ui.jsx";
+import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
 
@@ -63,8 +64,8 @@ export default function Schedule() {
           return (
             <Card key={l.id} style={{ padding: 15, display: "flex", alignItems: "center", gap: 14, opacity: cancelled ? 0.55 : 1 }}>
               <div style={{ textAlign: "center", width: 70 }}>
-                {l.status === "moved" && <div style={{ font: `11px ${sans}`, color: T.faint, textDecoration: "line-through" }}>{l.origDate}</div>}
-                <div style={{ font: `700 15px ${serif}`, color: T.ink }}>{l.date || "—"}</div>
+                {l.status === "moved" && <div style={{ font: `11px ${sans}`, color: T.faint, textDecoration: "line-through" }}>{fmtDateRu(l.origDate)}</div>}
+                <div style={{ font: `700 15px ${serif}`, color: T.ink }}>{fmtDateRu(l.date) || "—"}</div>
                 <div style={{ font: `12px ${sans}`, color: T.faint }}>{l.time}</div>
               </div>
               <div style={{ width: 1, height: 36, background: T.line }} />
@@ -96,7 +97,7 @@ export default function Schedule() {
           </select>
           <input style={input} placeholder="Тема занятия" value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} />
           <div style={{ display: "flex", gap: 10 }}>
-            <input style={input} placeholder="Дата (напр. 23 июн)" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <DatePicker value={form.date} onChange={(d) => setForm({ ...form, date: d })} />
             <input style={input} placeholder="Время (16:00)" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
           </div>
           <button style={btn} onClick={save}>Добавить</button>
@@ -106,8 +107,8 @@ export default function Schedule() {
       <Modal open={!!move} onClose={() => setMove(null)} title="Перенести занятие">
         {move && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ font: `13px ${sans}`, color: T.faint }}>Текущая дата: <b style={{ color: T.ink }}>{move.date}, {move.time}</b>. Старая дата сохранится в истории, зачёркнутой.</div>
-            <input style={input} placeholder="Новая дата" value={moveForm.date} onChange={(e) => setMoveForm({ ...moveForm, date: e.target.value })} />
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>Текущая дата: <b style={{ color: T.ink }}>{fmtDateRu(move.date)}, {move.time}</b>. Старая дата сохранится в истории, зачёркнутой.</div>
+            <DatePicker value={moveForm.date} onChange={(d) => setMoveForm({ ...moveForm, date: d })} />
             <input style={input} placeholder="Новое время" value={moveForm.time} onChange={(e) => setMoveForm({ ...moveForm, time: e.target.value })} />
             <button style={btn} onClick={confirmMove}>Подтвердить перенос</button>
           </div>

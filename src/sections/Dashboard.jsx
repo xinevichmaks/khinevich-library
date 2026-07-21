@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Wallet, BookOpen, Award, ChevronRight } from "lucide-react";
 import { Card, T, serif, sans, chip } from "../ui.jsx";
+import { MonthCalendar } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
 import { useCol } from "../useDB.js";
 import { scoreFraction, averagePct, computeWeakTopics } from "../grading.js";
@@ -69,46 +70,6 @@ function CandleChart({ rows }) {
   );
 }
 
-/* ---------- мини-календарь-виджет ---------- */
-function CalendarWidget({ title, year, monthIdx, markedDays, color, legend }) {
-  const first = new Date(year, monthIdx, 1).getDay();
-  const leading = (first + 6) % 7;
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-  const today = new Date();
-  const isCurMonth = today.getFullYear() === year && today.getMonth() === monthIdx;
-  const monthNames = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
-  const wd = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"];
-  const cells = [];
-  for (let i = 0; i < leading; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-
-  return (
-    <Card style={{ padding: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ font: `600 14.5px ${sans}`, color: T.ink }}>{title}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, font: `11px ${sans}`, color: T.faint }}>
-          <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, display: "inline-block" }} />{legend}
-        </div>
-      </div>
-      <div style={{ font: `12px ${sans}`, color: T.faint, textTransform: "capitalize", marginTop: 2 }}>{monthNames[monthIdx]} {year}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, textAlign: "center", marginTop: 10 }}>
-        {wd.map((w) => <div key={w} style={{ font: `600 10.5px ${sans}`, color: T.faint, paddingBottom: 4 }}>{w}</div>)}
-        {cells.map((d, i) => {
-          if (d == null) return <div key={i} />;
-          const marked = markedDays.includes(d);
-          const isToday = isCurMonth && today.getDate() === d;
-          return (
-            <div key={i} style={{ position: "relative", aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center", font: `13px ${sans}`, color: T.ink, borderRadius: 8, background: isToday ? T.accentSoft : "transparent" }}>
-              {marked && <span style={{ position: "absolute", inset: 2, borderRadius: 8, border: `2px solid ${color}` }} />}
-              <span style={{ position: "relative" }}>{d}</span>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
 /* ---------- слабые места ---------- */
 function WeakTopics({ sid, homework, mocks, tutorView }) {
   const data = useMemo(() => computeWeakTopics({ sid, homework, mocks }).slice(0, 5), [sid, homework, mocks]);
@@ -157,7 +118,7 @@ export default function Dashboard({ go }) {
       else if (h.grade) rows.push({ value: h.grade, max: null, when: h.due, createdAt: h.createdAt });
     });
     scoped(mocks).filter((m) => m.status === "Пройден").forEach((m) => rows.push({ value: m.score, max: m.total, when: m.date, createdAt: m.createdAt }));
-    return rows.sort((a, b) => (parseDay(a.when) || 0) - (parseDay(b.when) || 0));
+    return rows.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   }, [grades, homework, mocks, sid]);
 
   const avgScore = averagePct(gradeRows);
@@ -168,8 +129,8 @@ export default function Dashboard({ go }) {
     return [...src].sort((a, b) => (a.status === "Проверена" ? 1 : 0) - (b.status === "Проверена" ? 1 : 0)).slice(0, 5);
   }, [homework, myHw, role]);
 
-  const lessonDays = scoped(schedule).filter((l) => l.status !== "cancelled").map((l) => parseDay(l.date)).filter(Boolean);
-  const mockDays = scoped(mocks).map((m) => parseDay(m.date)).filter(Boolean);
+  const lessonDays = scoped(schedule).filter((l) => l.status !== "cancelled").map((l) => l.date).filter(Boolean);
+  const mockDays = scoped(mocks).map((m) => m.date).filter(Boolean);
 
   const now = new Date();
 
@@ -179,8 +140,8 @@ export default function Dashboard({ go }) {
     const paid = myProfile.paidLessons || 0;
     const done = doneLessons;
     const remaining = Math.max(0, paid - done);
-    const doneDays = scoped(schedule).filter((l) => l.status === "done").map((l) => parseDay(l.date)).filter(Boolean).sort((a, b) => a - b);
-    const avgGap = doneDays.length >= 2 ? (doneDays[doneDays.length - 1] - doneDays[0]) / (doneDays.length - 1) : 3.5;
+    const doneDates = scoped(schedule).filter((l) => l.status === "done" && l.date).map((l) => new Date(l.date + "T00:00:00")).sort((a, b) => a - b);
+    const avgGap = doneDates.length >= 2 ? (doneDates[doneDates.length - 1] - doneDates[0]) / 86400000 / (doneDates.length - 1) : 3.5;
     const daysUntil = Math.max(0, remaining - 1) * avgGap;
     const date = new Date(now.getTime() + daysUntil * 86400000);
     const months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
@@ -228,8 +189,8 @@ export default function Dashboard({ go }) {
       <WeakTopics sid={sid} homework={homework} mocks={mocks} tutorView={role === "tutor"} />
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 18 }}>
-        <CalendarWidget title="Занятия" year={now.getFullYear()} monthIdx={now.getMonth()} markedDays={lessonDays} color={T.down} legend="занятие" />
-        <CalendarWidget title="Пробники" year={now.getFullYear()} monthIdx={now.getMonth()} markedDays={mockDays} color={T.up} legend="пробник" />
+        <MonthCalendar title="Занятия" markedDates={lessonDays} color={T.down} legend="занятие" />
+        <MonthCalendar title="Пробники" markedDates={mockDays} color={T.up} legend="пробник" />
       </div>
 
       {role === "parent" && paidPrediction && (
