@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Wallet, BookOpen, Award, ChevronRight } from "lucide-react";
+import { CalendarDays, Wallet, BookOpen, Award, ChevronRight, PencilLine } from "lucide-react";
 import { Card, T, serif, sans, chip } from "../ui.jsx";
 import { MonthCalendar } from "../calendar.jsx";
 import { CandleChart } from "../chart.jsx";
@@ -106,10 +106,12 @@ export default function Dashboard({ go }) {
         {role === "tutor" && <>
           <Stat label="Занятий" val={scoped(schedule).length} Icon={CalendarDays} />
           <Stat label="Домашек выдано" val={scoped(homework).length} Icon={BookOpen} sub={`${scoped(homework).filter((h) => h.status !== "Выдана").length} сданы`} />
+          <Stat label="Пробников" val={scoped(mocks).length} Icon={PencilLine} sub={`${scoped(mocks).filter((m) => m.status === "Пройден").length} пройдено`} />
         </>}
         {role !== "tutor" && <>
           <Stat label="Занятий проведено" val={doneLessons} Icon={Wallet} sub={myProfile?.paidLessons ? `из ${myProfile.paidLessons} оплаченных` : undefined} />
           <Stat label="Домашек" val={myHw.length} Icon={BookOpen} sub={`${myHw.filter((h) => h.status !== "Выдана").length} выполнено`} />
+          <Stat label="Пробников" val={scoped(mocks).length} Icon={PencilLine} sub={`${scoped(mocks).filter((m) => m.status === "Пройден").length} пройдено`} />
         </>}
       </div>
 
