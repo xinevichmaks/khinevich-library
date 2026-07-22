@@ -1,13 +1,27 @@
 import { useState } from "react";
-import { Plus, Trash2, BookOpen } from "lucide-react";
+import { Plus, Trash2, BookOpen, Wallet, Globe, Link2 } from "lucide-react";
 import { Card, T, serif, sans, btn, btnGhost, input } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
-import { useCol, addItem, removeItem } from "../useDB.js";
+import { useCol, addItem, removeItem, updateItem } from "../useDB.js";
+
+const TIMEZONES = [
+  { v: "Europe/Kaliningrad", l: "Калининград (UTC+2)" },
+  { v: "Europe/Moscow", l: "Москва (UTC+3)" },
+  { v: "Europe/Samara", l: "Самара (UTC+4)" },
+  { v: "Asia/Yekaterinburg", l: "Екатеринбург (UTC+5)" },
+  { v: "Asia/Omsk", l: "Омск (UTC+6)" },
+  { v: "Asia/Krasnoyarsk", l: "Красноярск (UTC+7)" },
+  { v: "Asia/Irkutsk", l: "Иркутск (UTC+8)" },
+  { v: "Asia/Yakutsk", l: "Якутск (UTC+9)" },
+  { v: "Asia/Vladivostok", l: "Владивосток (UTC+10)" },
+];
 
 export default function SettingsPage() {
   const { profile, role } = useAuth();
   const { items: allSubjects } = useCol("subjects");
   const [name, setName] = useState("");
+  const [price, setPrice] = useState(profile.defaultLessonPrice || "");
+  const [tz, setTz] = useState(profile.timezone || "Europe/Moscow");
   const mySubjects = allSubjects.filter((s) => s.tutorId === profile.uid);
 
   const addSubject = async () => {
@@ -15,6 +29,10 @@ export default function SettingsPage() {
     await addItem("subjects", { tutorId: profile.uid, tutorName: profile.name, name: name.trim() });
     setName("");
   };
+  const savePrice = () => updateItem("users", profile.uid, { defaultLessonPrice: price });
+  const saveTz = (v) => { setTz(v); updateItem("users", profile.uid, { timezone: v }); };
+
+  const feedUrl = `${window.location.origin}/.netlify/functions/calendar-ics?tutorId=${profile.uid}`;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 620 }}>
@@ -39,6 +57,31 @@ export default function SettingsPage() {
       </Card>
 
       <Card style={{ padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, font: `600 16px ${sans}`, color: T.ink, marginBottom: 4 }}><Wallet size={18} color={T.accent} />Стандартная стоимость занятия</div>
+        <div style={{ font: `13px ${sans}`, color: T.faint, marginBottom: 12 }}>Ориентир для себя — подставится подсказкой при создании занятий в будущем.</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input style={{ ...input, maxWidth: 160 }} type="number" placeholder="Например 2500" value={price} onChange={(e) => setPrice(e.target.value)} />
+          <span style={{ display: "flex", alignItems: "center", font: `13px ${sans}`, color: T.faint }}>₽ за занятие</span>
+          <button style={btnGhost} onClick={savePrice}>Сохранить</button>
+        </div>
+      </Card>
+
+      <Card style={{ padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, font: `600 16px ${sans}`, color: T.ink, marginBottom: 4 }}><Globe size={18} color={T.accent} />Часовой пояс</div>
+        <div style={{ font: `13px ${sans}`, color: T.faint, marginBottom: 12 }}>Используется для отображения времени занятий в календаре и Apple-подписке.</div>
+        <select style={input} value={tz} onChange={(e) => saveTz(e.target.value)}>
+          {TIMEZONES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+        </select>
+      </Card>
+
+      <Card style={{ padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, font: `600 16px ${sans}`, color: T.ink, marginBottom: 4 }}><Link2 size={18} color={T.accent} />Ваш личный Apple Calendar</div>
+        <div style={{ font: `13px ${sans}`, color: T.faint, marginBottom: 12 }}>Раздельные календари уже работают: эта ссылка показывает занятия только ваших учеников, ученики по своей ссылке (в разделе «Календарь») видят только себя.</div>
+        <div style={{ padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: T.cardAlt, font: `12.5px ${sans}`, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{feedUrl}</div>
+        <div style={{ font: `11.5px ${sans}`, color: T.faint, marginTop: 8 }}>Полная инструкция по подключению — в разделе «Календарь».</div>
+      </Card>
+
+      <Card style={{ padding: 20 }}>
         <div style={{ font: `600 16px ${sans}`, color: T.ink, marginBottom: 4 }}>Профиль</div>
         <div style={{ font: `13px ${sans}`, color: T.faint, marginBottom: 12 }}>Имя и почта, которые видят ваши ученики.</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, font: `14px ${sans}`, color: T.ink }}>
@@ -46,8 +89,6 @@ export default function SettingsPage() {
           <div><b>Почта:</b> {profile.email}</div>
         </div>
       </Card>
-
-      <div style={{ font: `12px ${sans}`, color: T.faint }}>Скоро здесь появится: раздельные Apple-календари для вас и учеников, стандартная стоимость занятия, часовой пояс.</div>
     </div>
   );
 }
