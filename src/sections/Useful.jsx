@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { Plus, Play, Check } from "lucide-react";
+import { Plus, Play, Check, Trash2 } from "lucide-react";
 import { Card, Modal, Avatar, T, sans, btn, input, chip } from "../ui.jsx";
 import { useAuth } from "../auth.jsx";
-import { useCol, addItem, updateItem } from "../useDB.js";
+import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
 
 const parseId = (u) => {
   const m = u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);
@@ -78,7 +78,14 @@ export default function Useful() {
         {list.map((v) => {
           const watched = watchedIds.includes(v.id);
           return (
-          <div key={v.id} style={{ opacity: watched ? 0.6 : 1 }}>
+          <div key={v.id} style={{ opacity: watched ? 0.6 : 1, position: "relative" }}>
+            {isStaff && (
+              <button
+                onClick={(e) => { e.stopPropagation(); if (confirm(`Удалить видео «${v.title}» из «Полезного»?`)) removeItem("useful", v.id); }}
+                title="Удалить видео"
+                style={{ position: "absolute", top: 8, right: 8, zIndex: 2, width: 28, height: 28, borderRadius: "50%", border: "none", background: "rgba(0,0,0,.55)", display: "grid", placeItems: "center", cursor: "pointer" }}
+              ><Trash2 size={14} color="#fff" /></button>
+            )}
             <div onClick={() => setOpen(v)} style={{ position: "relative", borderRadius: 12, overflow: "hidden", aspectRatio: "16/9", background: "#000", cursor: "pointer" }}>
               <img alt="" src={`https://i.ytimg.com/vi/${v.vid}/hqdefault.jpg`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", background: "rgba(0,0,0,.12)" }}>
