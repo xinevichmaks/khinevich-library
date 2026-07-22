@@ -42,7 +42,7 @@ export default function Mocks() {
     (m.title + " " + (m.subject || "") + " " + (m.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
     (!filterTag || (m.tagIds || []).includes(filterTag))
   ).sort((a, b) => sortBy === "alpha"
-    ? a.title.localeCompare(b.title, "ru")
+    ? a.title.localeCompare(b.title, "ru", { numeric: true })
     : (a.date || "9999-99-99").localeCompare(b.date || "9999-99-99"));
   const tagById = (id) => allTags.find((t) => t.id === id);
 

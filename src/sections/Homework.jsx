@@ -54,7 +54,7 @@ export default function Homework() {
     (h.title + " " + (h.desc || "") + " " + (h.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
     (!filterTag || (h.tagIds || []).includes(filterTag))
   ).sort((a, b) => sortBy === "alpha"
-    ? a.title.localeCompare(b.title, "ru")
+    ? a.title.localeCompare(b.title, "ru", { numeric: true })
     : (a.due || "9999-99-99").localeCompare(b.due || "9999-99-99"));
   const tagById = (id) => allTags.find((t) => t.id === id);
 
