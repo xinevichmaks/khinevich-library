@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, ListChecks, Check, X, Eye, Search, Settings2, Tag } from "lucide-react";
+import { Plus, Trash2, ListChecks, Check, X, Eye, Search, Settings2, Tag, Edit3 } from "lucide-react";
 import { Card, Modal, T, sans, btn, btnGhost, iconBtn, input, chip, TAG_PALETTE } from "../ui.jsx";
 import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
@@ -44,6 +44,7 @@ export default function Mocks() {
   const tagById = (id) => allTags.find((t) => t.id === id);
 
   const [add, setAdd] = useState(false);
+  const [editingMock, setEditingMock] = useState(null);
   const [targetIds, setTargetIds] = useState(new Set());
   const [form, setForm] = useState({ title: "", subject: "", date: "" });
   const [qs, setQs] = useState([]);
@@ -76,13 +77,26 @@ export default function Mocks() {
   };
 
   const save = async () => {
-    if (!form.title || targetIds.size === 0) return;
+    if (!form.title) return;
     const cleanQs = qs.filter((q) => q.q.trim());
+    if (editingMock) {
+      await updateItem("mocks", editingMock.id, { ...form, ...(cleanQs.length ? { questions: JSON.parse(JSON.stringify(cleanQs)) } : {}) });
+      setEditingMock(null); setAdd(false); setForm({ title: "", subject: "", date: "" }); setQs([]);
+      return;
+    }
+    if (targetIds.size === 0) return;
     await Promise.all([...targetIds].map((studentId) => {
       const st = users.find((u) => u.id === studentId);
       return addItem("mocks", { ...form, studentId, studentName: st?.name || "", tutorId: profile.uid, status: "Ожидает", questions: JSON.parse(JSON.stringify(cleanQs)) });
     }));
     setAdd(false); setForm({ title: "", subject: "", date: "" }); setQs([]); setTargetIds(new Set());
+  };
+
+  const openEditMock = (m) => {
+    setEditingMock(m);
+    setForm({ title: m.title, subject: m.subject || "", date: m.date || "" });
+    setQs(m.questions || []);
+    setAdd(true);
   };
 
   const submitTake = async () => {
@@ -137,7 +151,7 @@ export default function Mocks() {
   return (
     <div>
       {role === "tutor" && <div style={{ marginBottom: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Добавить пробник</button>
+        <button style={btn} onClick={() => { setEditingMock(null); setForm({ title: "", subject: "", date: "" }); setQs([]); setAdd(true); }}><Plus size={16} />Добавить пробник</button>
         <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
       </div>}
 
@@ -185,6 +199,7 @@ export default function Mocks() {
                 {role === "student" && !answered && <button style={btn} onClick={() => { setTaking(m); setAnswers({}); }}>Пройти пробник</button>}
                 {answered && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setReview(m)}><ListChecks size={15} />Разбор ответов</button>}
                 {role === "tutor" && needsReview && <button style={btn} onClick={() => { setGrading(m); setGradeInputs(m.manualScores || {}); }}>✍️ Проверить вручную</button>}
+                {role === "tutor" && <button title="Просмотреть и редактировать" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => openEditMock(m)}><Edit3 size={15} />Редактировать</button>}
                 {role === "tutor" && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(m)}><Tag size={15} /></button>}
                 {role === "tutor" && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("mocks", m.id)}><Trash2 size={15} /></button>}
               </div>
@@ -195,17 +210,21 @@ export default function Mocks() {
       </div>
 
       {/* ---------- создание пробника ---------- */}
-      <Modal open={add} onClose={() => setAdd(false)} title="Новый пробник" wide>
+      <Modal open={add} onClose={() => { setAdd(false); setEditingMock(null); }} title={editingMock ? `Редактировать: ${editingMock.title}` : "Новый пробник"} wide>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Кому назначить (можно выбрать нескольких)</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {students.map((s) => {
-                const on = targetIds.has(s.id);
-                return <button key={s.id} onClick={() => toggleTarget(s.id)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? T.accent : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>{s.name}</button>;
-              })}
+          {editingMock ? (
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>Ученик: <b style={{ color: T.ink }}>{editingMock.studentName}</b></div>
+          ) : (
+            <div>
+              <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Кому назначить (можно выбрать нескольких)</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {students.map((s) => {
+                  const on = targetIds.has(s.id);
+                  return <button key={s.id} onClick={() => toggleTarget(s.id)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? T.accent : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>{s.name}</button>;
+                })}
+              </div>
             </div>
-          </div>
+          )}
           <input style={input} placeholder="Название пробника" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <div style={{ display: "flex", gap: 10 }}>
             <input style={input} placeholder="Предмет" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
@@ -232,8 +251,8 @@ export default function Mocks() {
                   <input style={{ ...input, marginBottom: 8 }} placeholder="Тема (для слабых мест)" value={q.topic} onChange={(e) => updQ(i, { topic: e.target.value })} />
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                     <span style={{ font: `12px ${sans}`, color: T.faint }}>Вариантов ответа:</span>
-                    <input type="number" min={2} max={6} value={q.opts.length} style={{ width: 56, padding: "5px 8px", borderRadius: 7, border: `1px solid ${T.lineDk}` }}
-                      onChange={(e) => { let n = Math.max(2, Math.min(6, Number(e.target.value) || 2)); const opts = q.opts.slice(0, n); while (opts.length < n) opts.push(""); updQ(i, { opts, correct: q.correct >= n ? 0 : q.correct }); }} />
+                    <input type="number" min={2} max={10} value={q.opts.length} style={{ width: 56, padding: "5px 8px", borderRadius: 7, border: `1px solid ${T.lineDk}` }}
+                      onChange={(e) => { let n = Math.max(2, Math.min(10, Number(e.target.value) || 2)); const opts = q.opts.slice(0, n); while (opts.length < n) opts.push(""); updQ(i, { opts, correct: q.correct >= n ? 0 : q.correct }); }} />
                   </div>
                   {q.opts.map((o, j) => (
                     <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>

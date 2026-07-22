@@ -77,7 +77,7 @@ export default function SettingsPage() {
       <Card style={{ padding: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, font: `600 16px ${sans}`, color: T.ink, marginBottom: 4 }}><Link2 size={18} color={T.accent} />Ваш личный Apple Calendar</div>
         <div style={{ font: `13px ${sans}`, color: T.faint, marginBottom: 12 }}>Раздельные календари уже работают: эта ссылка показывает занятия только ваших учеников, ученики по своей ссылке (в разделе «Календарь») видят только себя.</div>
-        <div style={{ padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: T.cardAlt, font: `12.5px ${sans}`, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{feedUrl}</div>
+        <div style={{ padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: T.cardAlt, font: `12.5px ${sans}`, color: T.ink, wordBreak: "break-all", minHeight: 90, lineHeight: 1.6 }}>{feedUrl}</div>
         <div style={{ font: `11.5px ${sans}`, color: T.faint, marginTop: 8 }}>Полная инструкция по подключению — в разделе «Календарь».</div>
       </Card>
 

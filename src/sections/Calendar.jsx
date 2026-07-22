@@ -117,9 +117,9 @@ export default function CalendarPage() {
             <li>На iPhone/Mac: Календарь → Файл → Новая подписка на календарь (на iPhone: Настройки → Календарь → Учётные записи → Добавить учётную запись → Другое → Подписной календарь)</li>
             <li>Вставьте ссылку и подтвердите</li>
           </ol>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ flex: 1, padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: T.cardAlt, font: `13px ${sans}`, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{feedUrl}</div>
-            <button style={btn} onClick={copyLink}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? "Скопировано" : "Копировать"}</button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.lineDk}`, background: T.cardAlt, font: `13px ${sans}`, color: T.ink, wordBreak: "break-all", minHeight: 100, lineHeight: 1.6 }}>{feedUrl}</div>
+            <button style={{ ...btn, alignSelf: "flex-start" }} onClick={copyLink}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? "Скопировано" : "Копировать"}</button>
           </div>
           <div style={{ font: `12px ${sans}`, color: T.faint }}>{sid ? "Эта ссылка покажет только ваши занятия." : role === "admin" ? "Эта ссылка (администратор) покажет занятия всех учеников всех репетиторов." : "Эта ссылка покажет занятия только ваших учеников — данные других репетиторов не видны."}</div>
         </div>

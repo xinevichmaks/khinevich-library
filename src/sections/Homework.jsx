@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X, Search, Settings2, Tag, Repeat } from "lucide-react";
+import { Plus, CheckCircle2, Circle, BadgeCheck, AlertCircle, RotateCcw, Trash2, Eye, ListChecks, Check, X, Search, Settings2, Tag, Repeat, Edit3 } from "lucide-react";
 import { Card, Modal, T, sans, btn, btnGhost, iconBtn, input, chip, TAG_PALETTE } from "../ui.jsx";
 import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
@@ -25,6 +25,7 @@ export default function Homework() {
   const myTutorId = isStaff ? profile.uid : users.find((u) => u.id === sid)?.tutorId;
   const tags = isStaff ? allTags.filter((t) => t.tutorId === profile.uid) : allTags.filter((t) => t.tutorId === myTutorId);
   const [add, setAdd] = useState(false);
+  const [editingHw, setEditingHw] = useState(null); // домашка, которую редактируем (или null — режим создания)
   const [targetIds, setTargetIds] = useState(new Set());
   const [form, setForm] = useState({ title: "", desc: "", due: "", materialId: "", tagIds: [] });
   const [qs, setQs] = useState([]); // автопроверяемые вопросы для новой домашки
@@ -60,14 +61,27 @@ export default function Homework() {
   const updOpt = (i, j, v) => setQs(qs.map((q, idx) => (idx === i ? { ...q, opts: q.opts.map((o, oi) => (oi === j ? v : o)) } : q)));
 
   const save = async () => {
-    if (!form.title || targetIds.size === 0) return;
+    if (!form.title) return;
     const cleanQs = qs.filter((q) => q.q.trim());
+    if (editingHw) {
+      await updateItem("homework", editingHw.id, { ...form, ...(cleanQs.length ? { questions: cleanQs } : {}) });
+      setEditingHw(null); setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]);
+      return;
+    }
+    if (targetIds.size === 0) return;
     await Promise.all([...targetIds].map(async (studentId) => {
       const st = users.find((u) => u.id === studentId);
       await addItem("homework", { ...form, studentId, studentName: st?.name || "", tutorId: profile.uid, status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
       await notify(studentId, st?.name || "", `Новое домашнее задание: «${form.title}»`, "new_homework");
     }));
     setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]); setTargetIds(new Set());
+  };
+
+  const openEdit = (h) => {
+    setEditingHw(h);
+    setForm({ title: h.title, desc: h.desc || "", due: h.due || "", materialId: h.materialId || "", tagIds: h.tagIds || [] });
+    setQs(h.questions || []);
+    setAdd(true);
   };
 
   const submitText = async () => {
@@ -128,7 +142,7 @@ export default function Homework() {
   return (
     <div>
       {isStaff && <div style={{ marginBottom: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button style={btn} onClick={() => setAdd(true)}><Plus size={16} />Выдать домашку</button>
+        <button style={btn} onClick={() => { setEditingHw(null); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]); setAdd(true); }}><Plus size={16} />Выдать домашку</button>
         <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
       </div>}
 
@@ -204,6 +218,7 @@ export default function Homework() {
                   </>}
                   {isStaff && h.status === "Требует проверки" && <button style={btn} onClick={() => { setGrading(h); setGradePoints(h.manualScores || {}); }}>✍️ Проверить вручную</button>}
                   {isStaff && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(h)}><Tag size={15} /></button>}
+                  {isStaff && <button title="Просмотреть и редактировать" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => openEdit(h)}><Edit3 size={15} />Редактировать</button>}
                   {isStaff && <button title="Задать ещё раз или другим ученикам" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => { setReassigning(h); setReassignIds(new Set([h.studentId])); setReassignDue(""); }}><Repeat size={15} />Задать ещё</button>}
                   {isStaff && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("homework", h.id)}><Trash2 size={15} /></button>}
                 </div>
@@ -249,17 +264,21 @@ export default function Homework() {
       })()}
 
       {/* ---------- создание домашки ---------- */}
-      <Modal open={add} onClose={() => setAdd(false)} title="Новая домашка" wide>
+      <Modal open={add} onClose={() => { setAdd(false); setEditingHw(null); }} title={editingHw ? `Редактировать: ${editingHw.title}` : "Новая домашка"} wide>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Кому выдать (можно выбрать нескольких)</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {students.map((s) => {
-                const on = targetIds.has(s.id);
-                return <button key={s.id} onClick={() => toggleTarget(s.id)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? T.accent : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>{s.name}</button>;
-              })}
+          {editingHw ? (
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>Ученик: <b style={{ color: T.ink }}>{editingHw.studentName}</b> (чтобы назначить другим — используйте «Задать ещё»)</div>
+          ) : (
+            <div>
+              <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Кому выдать (можно выбрать нескольких)</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {students.map((s) => {
+                  const on = targetIds.has(s.id);
+                  return <button key={s.id} onClick={() => toggleTarget(s.id)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? T.accent : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>{s.name}</button>;
+                })}
+              </div>
             </div>
-          </div>
+          )}
           <input style={input} placeholder="Задание" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <textarea style={{ ...input, minHeight: 90, resize: "vertical" }} placeholder="Описание / что сделать" value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} />
           <div style={{ display: "flex", gap: 10 }}>
@@ -301,15 +320,17 @@ export default function Homework() {
                   <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     <input type="radio" name={`c${i}`} checked={q.correct === j} onChange={() => updQ(i, { correct: j })} title="Верный ответ" />
                     <input style={input} placeholder={`Вариант ${j + 1}`} value={o} onChange={(e) => updOpt(i, j, e.target.value)} />
+                    {q.opts.length > 2 && <button title="Удалить вариант" style={{ background: "none", border: "none", cursor: "pointer", color: T.faint }} onClick={() => setQs(qs.map((qq, idx) => idx === i ? { ...qq, opts: qq.opts.filter((_, oi) => oi !== j), correct: qq.correct === j ? 0 : qq.correct > j ? qq.correct - 1 : qq.correct } : qq))}><X size={14} /></button>}
                   </div>
                 ))}
-                <div style={{ font: `12px ${sans}`, color: T.faint }}>Отметьте кружком верный вариант.</div>
+                {q.opts.length < 10 && <button style={{ ...btnGhost, padding: "6px 11px", font: `12px ${sans}` }} onClick={() => setQs(qs.map((qq, idx) => idx === i ? { ...qq, opts: [...qq.opts, ""] } : qq))}><Plus size={13} />Ещё вариант ({q.opts.length}/10)</button>}
+                <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>Отметьте кружком верный вариант.</div>
               </Card>
             ))}
             <button style={btnGhost} onClick={addQ}><Plus size={15} />Добавить вопрос</button>
           </div>
 
-          <button style={btn} onClick={save}>Выдать</button>
+          <button style={btn} onClick={save}>{editingHw ? "Сохранить изменения" : "Выдать"}</button>
         </div>
       </Modal>
 

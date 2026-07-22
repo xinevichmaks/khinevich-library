@@ -75,14 +75,14 @@ export default function Notes() {
               }} />
               <div style={{
                 background: color, borderRadius: 3, padding: "22px 14px 16px", minHeight: 150,
-                boxShadow: "0 8px 16px rgba(0,0,0,.28)", opacity: notReq ? 0.6 : 1, display: "flex", flexDirection: "column", gap: 10,
+                boxShadow: "0 8px 16px rgba(0,0,0,.28)", opacity: (notReq || done) ? 0.55 : 1, display: "flex", flexDirection: "column", gap: 10,
               }}>
                 <div style={{ font: `14px/1.4 ${sans}`, color: "#2a2118", whiteSpace: "pre-wrap", textDecoration: done ? "line-through" : "none", flex: 1 }}>{n.text}</div>
                 {n.studentName && <div style={{ font: `11px ${sans}`, color: "#5a4a35" }}>👤 {n.studentName}</div>}
                 {n.due && <div style={{ font: `11px ${sans}`, color: "#5a4a35" }}>⏰ {fmtDateRu(n.due)}</div>}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
                   <span style={{ font: `600 10.5px ${sans}`, color: "#5a4a35", background: "rgba(255,255,255,.5)", padding: "2px 7px", borderRadius: 20 }}>{STATUS_LABEL[n.status]}</span>
-                  {isStaff && n.status !== "not_required" && (
+                  {(isStaff || n.studentId === sid) && n.status !== "not_required" && (
                     <button onClick={() => toggleDone(n)} title={done ? "Вернуть в работу" : "Отметить выполненной"} style={{ background: "none", border: "none", cursor: "pointer", color: done ? "#3f7a4d" : "#5a4a35" }}><Check size={16} /></button>
                   )}
                   {isStaff && <button onClick={() => removeItem("notes", n.id)} title="Удалить" style={{ background: "none", border: "none", cursor: "pointer", color: "#8a4a3a" }}><Trash2 size={14} /></button>}

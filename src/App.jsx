@@ -69,6 +69,7 @@ export default function App() {
   const [tab, setTab] = useState("dash");
   const [navOpen, setNavOpen] = useState(false);
   const { items: allUsers } = useCol("users");
+  const { items: allNotifications } = useCol("notifications");
 
   if (loading) return <Splash text="Загрузка…" />;
   if (!user || !profile) return <><style>{globalCss}</style><Auth /></>;
@@ -84,6 +85,11 @@ export default function App() {
   const current = nav.find((n) => n.id === tab) ? tab : "dash";
   const goTab = (id) => { setTab(id); setNavOpen(false); };
 
+  const sidForNotif = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
+  const unreadNotifs = allNotifications.filter((n) => !n.read && (sidForNotif ? n.studentId === sidForNotif : role === "admin" ? true : allUsers.find((u) => u.id === n.studentId)?.tutorId === profile.uid));
+  const NOTIF_TYPE_TO_NAV = { new_homework: "homework", homework_done: "homework", homework_checked: "homework", new_grade: "grades", new_note: "notes" };
+  const navBadge = (id) => id === "notifications" ? unreadNotifs.length : unreadNotifs.filter((n) => NOTIF_TYPE_TO_NAV[n.type] === id).length;
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: T.bg, color: T.ink }}>
       <style>{globalCss}</style>
@@ -98,9 +104,15 @@ export default function App() {
           <button className="hamburger-btn" onClick={() => setNavOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,.8)" }}><X size={20} /></button>
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 3, overflow: "auto" }}>
-          {nav.map(({ id, label, Icon }) => (
-            <button key={id} onClick={() => goTab(id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", background: current === id ? T.accent : "transparent", color: current === id ? "#fff" : "rgba(255,255,255,.78)", font: `600 14px ${sans}`, textAlign: "left" }}><Icon size={18} />{label}</button>
-          ))}
+          {nav.map(({ id, label, Icon }) => {
+            const badge = navBadge(id);
+            return (
+            <button key={id} onClick={() => goTab(id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", background: current === id ? T.accent : "transparent", color: current === id ? "#fff" : "rgba(255,255,255,.78)", font: `600 14px ${sans}`, textAlign: "left", position: "relative" }}>
+              <Icon size={18} /><span style={{ flex: 1 }}>{label}</span>
+              {badge > 0 && <span style={{ background: current === id ? "#fff" : T.accent, color: current === id ? T.accent : "#fff", borderRadius: 20, minWidth: 18, height: 18, padding: "0 5px", font: `700 10.5px ${sans}`, display: "flex", alignItems: "center", justifyContent: "center" }}>{badge > 9 ? "9+" : badge}</span>}
+            </button>
+            );
+          })}
         </nav>
         {canSwitchSelfRole && !isImpersonating && (
           <div style={{ display: "flex", gap: 4, padding: 4, background: "rgba(0,0,0,.2)", borderRadius: 9, marginTop: 10 }}>
