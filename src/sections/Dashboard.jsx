@@ -115,21 +115,23 @@ export default function Dashboard({ go }) {
         </>}
       </div>
 
-      <Card style={{ padding: 18 }}>
-        <div style={{ font: `600 15px ${sans}`, color: T.ink, marginBottom: 2 }}>Ожидающая домашка</div>
-        <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 6 }}>до 5 последних заданий</div>
-        {pendingHw.length === 0 ? <div style={{ font: `14px ${sans}`, color: T.faint, padding: "6px 0" }}>Домашних заданий пока нет.</div> :
-          pendingHw.map((h) => (
-            <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 0", borderBottom: `1px solid ${T.line}` }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ font: `600 13.5px ${sans}`, color: T.ink }}>{h.title}</div>
-                <div style={{ font: `12px ${sans}`, color: T.faint }}>{role === "tutor" ? `${h.studentName} · ` : ""}срок {h.due || "—"}</div>
+      {role !== "tutor" && role !== "admin" && (
+        <Card style={{ padding: 18 }}>
+          <div style={{ font: `600 15px ${sans}`, color: T.ink, marginBottom: 2 }}>Ожидающая домашка</div>
+          <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 6 }}>до 5 последних заданий</div>
+          {pendingHw.length === 0 ? <div style={{ font: `14px ${sans}`, color: T.faint, padding: "6px 0" }}>Домашних заданий пока нет.</div> :
+            pendingHw.map((h) => (
+              <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 0", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ font: `600 13.5px ${sans}`, color: T.ink }}>{h.title}</div>
+                  <div style={{ font: `12px ${sans}`, color: T.faint }}>{role === "tutor" ? `${h.studentName} · ` : ""}срок {h.due || "—"}</div>
+                </div>
+                <span style={chip}>{h.status}</span>
               </div>
-              <span style={chip}>{h.status}</span>
-            </div>
-          ))}
-        <button onClick={() => go("homework")} style={{ marginTop: 10, font: `600 13px ${sans}`, color: T.accent, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3, padding: 0 }}>Все задания <ChevronRight size={14} /></button>
-      </Card>
+            ))}
+          <button onClick={() => go("homework")} style={{ marginTop: 10, font: `600 13px ${sans}`, color: T.accent, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3, padding: 0 }}>Все задания <ChevronRight size={14} /></button>
+        </Card>
+      )}
 
       <Card style={{ padding: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
@@ -140,7 +142,9 @@ export default function Dashboard({ go }) {
         <div style={{ font: `11.5px ${sans}`, color: T.faint, marginTop: 6 }}>зелёная свеча — балл вырос к предыдущему, красная — снизился · шкала: 5→100%, 4→80%, 3→60%, 2→40%, либо балл из максимума</div>
       </Card>
 
-      <WeakTopics sid={sid} homework={scoped(homework)} mocks={scoped(mocks)} tutorView={role === "tutor"} />
+      {role !== "tutor" && role !== "admin" && (
+        <WeakTopics sid={sid} homework={scoped(homework)} mocks={scoped(mocks)} tutorView={role === "tutor"} />
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 18 }}>
         <MonthCalendar title="Занятия" markedDates={lessonDays} color={T.down} legend="занятие" />

@@ -57,6 +57,7 @@ export default function Mocks() {
   const [review, setReview] = useState(null);
   const [grading, setGrading] = useState(null);
   const [gradeInputs, setGradeInputs] = useState({});
+  const [gradeSlide, setGradeSlide] = useState(0);
   const [reassigning, setReassigning] = useState(null);
   const [reassignIds, setReassignIds] = useState(new Set());
   const [reassignDue, setReassignDue] = useState("");
@@ -223,7 +224,7 @@ export default function Mocks() {
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 {role === "student" && !answered && <button style={btn} onClick={() => { setTaking(m); setAnswers({}); }}>Пройти пробник</button>}
                 {answered && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setReview(m)}><ListChecks size={15} />Разбор ответов</button>}
-                {isStaff && needsReview && <button style={btn} onClick={() => { setGrading(m); setGradeInputs(m.manualScores || {}); }}>✍️ Проверить вручную</button>}
+                {isStaff && needsReview && <button style={btn} onClick={() => { setGrading(m); setGradeInputs(m.manualScores || {}); setGradeSlide(0); }}>✍️ Проверить вручную</button>}
                 {isStaff && <button title="Просмотреть и редактировать" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => openEditMock(m)}><Edit3 size={15} />Редактировать</button>}
                 {isStaff && <button title="Задать ещё раз или другим ученикам" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => { setReassigning(m); setReassignIds(new Set([m.studentId])); setReassignDue(""); }}><Repeat size={15} />Задать ещё</button>}
                 {isStaff && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(m)}><Tag size={15} /></button>}
@@ -498,29 +499,52 @@ export default function Mocks() {
 
       {/* ---------- ручная проверка графиковых вопросов ---------- */}
       <Modal open={!!grading} onClose={() => setGrading(null)} title="Проверка развёрнутых ответов" wide>
-        {grading && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ font: `13px ${sans}`, color: T.faint }}>{grading.studentName} · {grading.title}</div>
-            {grading.questions.map((q, i) => {
-              if ((q.type || "single") !== "graph") return null;
-              return (
-                <div key={i} style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>
-                  <div style={{ font: `11px ${sans}`, color: T.faint, textTransform: "uppercase", marginBottom: 3 }}>{q.topic || ""}</div>
-                  <div style={{ font: `600 14px ${sans}`, color: T.ink, marginBottom: 6 }}>{i + 1}. {q.q}</div>
-                  <div style={{ font: `13px/1.5 ${sans}`, color: T.faint, marginBottom: 6 }}>{q.promptText}</div>
-                  {q.imageData && <img src={q.imageData} style={{ maxWidth: "100%", borderRadius: 9, border: `1px solid ${T.line}`, marginBottom: 8, display: "block" }} />}
-                  <div style={{ font: `14px/1.6 ${sans}`, color: T.ink, whiteSpace: "pre-wrap", background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 9, padding: 10, marginBottom: 8 }}>{grading.answers[i] || "Ученик не дал ответа."}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ font: `12px ${sans}`, color: T.faint }}>Баллы:</span>
-                    <input type="number" min={0} max={q.maxPoints} value={gradeInputs[i] ?? ""} onChange={(e) => setGradeInputs({ ...gradeInputs, [i]: e.target.value })} style={{ width: 60, padding: "5px 8px", borderRadius: 7, border: `1px solid ${T.lineDk}` }} />
-                    <span style={{ font: `12px ${sans}`, color: T.faint }}>из {q.maxPoints}</span>
-                  </div>
+        {grading && (() => {
+          const graphQs = grading.questions.map((q, i) => ({ q, i })).filter(({ q }) => (q.type || "single") === "graph");
+          if (graphQs.length === 0) return <div style={{ font: `14px ${sans}`, color: T.faint }}>В этом пробнике нет заданий с ручной проверкой.</div>;
+          const slide = Math.min(gradeSlide, graphQs.length - 1);
+          const { q, i } = graphQs[slide];
+          const val = gradeInputs[i] ?? "";
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ font: `13px ${sans}`, color: T.faint }}>{grading.studentName} · {grading.title}</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {graphQs.map((_, k) => (
+                    <span key={k} onClick={() => setGradeSlide(k)} style={{ width: 8, height: 8, borderRadius: "50%", background: k === slide ? T.accent : T.line, cursor: "pointer" }} />
+                  ))}
                 </div>
-              );
-            })}
-            <button style={btn} onClick={saveGrades}>Сохранить баллы</button>
-          </div>
-        )}
+              </div>
+
+              <Card style={{ padding: 20, position: "relative" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <span style={chip}>{q.topic || "Задание"}</span>
+                  <span style={{ font: `600 12px ${sans}`, color: T.faint }}>{slide + 1} из {graphQs.length}</span>
+                </div>
+                <div style={{ font: `600 15px ${sans}`, color: T.ink, marginBottom: 8 }}>{i + 1}. {q.q}</div>
+                {q.promptText && <div style={{ font: `13px/1.5 ${sans}`, color: T.faint, marginBottom: 10, whiteSpace: "pre-wrap" }}>{q.promptText}</div>}
+                {q.imageData && <img src={q.imageData} style={{ maxWidth: "100%", borderRadius: 9, border: `1px solid ${T.line}`, marginBottom: 10, display: "block" }} />}
+                <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 4 }}>Ответ ученика:</div>
+                <div style={{ font: `14px/1.6 ${sans}`, color: T.ink, whiteSpace: "pre-wrap", background: T.cardAlt, border: `1px solid ${T.line}`, borderRadius: 9, padding: 12, marginBottom: 14, minHeight: 60 }}>{grading.answers[i] || "Ученик не дал ответа."}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ font: `13px ${sans}`, color: T.faint }}>Баллы:</span>
+                  <input type="number" min={0} max={q.maxPoints} value={val} onChange={(e) => setGradeInputs({ ...gradeInputs, [i]: e.target.value })} style={{ width: 70, padding: "8px 10px", borderRadius: 8, border: `1px solid ${T.lineDk}`, font: `600 14px ${sans}` }} />
+                  <span style={{ font: `13px ${sans}`, color: T.faint }}>из максимальных {q.maxPoints}</span>
+                </div>
+              </Card>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <button disabled={slide === 0} onClick={() => setGradeSlide(slide - 1)} style={{ ...btnGhost, opacity: slide === 0 ? 0.4 : 1, cursor: slide === 0 ? "default" : "pointer" }}>← Предыдущее</button>
+                {slide < graphQs.length - 1 ? (
+                  <button style={btn} onClick={() => setGradeSlide(slide + 1)}>Следующее →</button>
+                ) : (
+                  <button style={btn} onClick={saveGrades}>Сохранить баллы</button>
+                )}
+              </div>
+              {slide === graphQs.length - 1 && <button style={{ ...btnGhost, alignSelf: "flex-start" }} onClick={saveGrades}>Сохранить баллы сейчас (не дожидаясь конца)</button>}
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* ---------- задать ещё раз / другим ученикам ---------- */}
