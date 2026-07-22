@@ -31,6 +31,7 @@ export default function Homework() {
   const [qs, setQs] = useState([]); // автопроверяемые вопросы для новой домашки
   const [q, setQ] = useState(""); // поиск
   const [filterTag, setFilterTag] = useState(null);
+  const [sortBy, setSortBy] = useState("date"); // "date" | "alpha"
   const [tagManager, setTagManager] = useState(false);
   const [tagging, setTagging] = useState(null); // домашка, которой сейчас назначаем теги
   const [reassigning, setReassigning] = useState(null); // домашка, которую переназначаем
@@ -52,7 +53,9 @@ export default function Homework() {
   const list = scoped.filter((h) =>
     (h.title + " " + (h.desc || "") + " " + (h.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
     (!filterTag || (h.tagIds || []).includes(filterTag))
-  );
+  ).sort((a, b) => sortBy === "alpha"
+    ? a.title.localeCompare(b.title, "ru")
+    : (a.due || "9999-99-99").localeCompare(b.due || "9999-99-99"));
   const tagById = (id) => allTags.find((t) => t.id === id);
 
   const toggleTarget = (id) => setTargetIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -149,6 +152,11 @@ export default function Homework() {
       <div style={{ position: "relative", marginBottom: 12 }}>
         <Search size={17} color={T.faint} style={{ position: "absolute", left: 12, top: 11 }} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по домашним заданиям…" style={{ ...input, paddingLeft: 38 }} />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ font: `12px ${sans}`, color: T.faint }}>Сортировка:</span>
+        <button onClick={() => setSortBy("date")} style={{ ...chip, background: sortBy === "date" ? T.accent : T.card, color: sortBy === "date" ? "#fff" : T.ink, border: `1px solid ${sortBy === "date" ? T.accent : T.line}`, cursor: "pointer" }}>По ближайшему дедлайну</button>
+        <button onClick={() => setSortBy("alpha")} style={{ ...chip, background: sortBy === "alpha" ? T.accent : T.card, color: sortBy === "alpha" ? "#fff" : T.ink, border: `1px solid ${sortBy === "alpha" ? T.accent : T.line}`, cursor: "pointer" }}>По алфавиту</button>
       </div>
       {tags.length > 0 && (
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>

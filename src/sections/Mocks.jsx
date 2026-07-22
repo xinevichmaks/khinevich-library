@@ -35,12 +35,15 @@ export default function Mocks() {
     : (role === "admin" ? mocks : mocks.filter((m) => m.tutorId === profile.uid));
   const [q, setQ] = useState("");
   const [filterTag, setFilterTag] = useState(null);
+  const [sortBy, setSortBy] = useState("date");
   const [tagManager, setTagManager] = useState(false);
   const [tagging, setTagging] = useState(null);
   const list = scoped.filter((m) =>
     (m.title + " " + (m.subject || "") + " " + (m.studentName || "")).toLowerCase().includes(q.toLowerCase()) &&
     (!filterTag || (m.tagIds || []).includes(filterTag))
-  );
+  ).sort((a, b) => sortBy === "alpha"
+    ? a.title.localeCompare(b.title, "ru")
+    : (a.date || "9999-99-99").localeCompare(b.date || "9999-99-99"));
   const tagById = (id) => allTags.find((t) => t.id === id);
 
   const [add, setAdd] = useState(false);
@@ -158,6 +161,11 @@ export default function Mocks() {
       <div style={{ position: "relative", marginBottom: 12 }}>
         <Search size={17} color={T.faint} style={{ position: "absolute", left: 12, top: 11 }} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по пробникам…" style={{ ...input, paddingLeft: 38 }} />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ font: `12px ${sans}`, color: T.faint }}>Сортировка:</span>
+        <button onClick={() => setSortBy("date")} style={{ ...chip, background: sortBy === "date" ? T.accent : T.card, color: sortBy === "date" ? "#fff" : T.ink, border: `1px solid ${sortBy === "date" ? T.accent : T.line}`, cursor: "pointer" }}>По ближайшей дате</button>
+        <button onClick={() => setSortBy("alpha")} style={{ ...chip, background: sortBy === "alpha" ? T.accent : T.card, color: sortBy === "alpha" ? "#fff" : T.ink, border: `1px solid ${sortBy === "alpha" ? T.accent : T.line}`, cursor: "pointer" }}>По алфавиту</button>
       </div>
       {tags.length > 0 && (
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
