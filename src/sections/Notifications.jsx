@@ -23,11 +23,12 @@ export default function Notifications() {
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
   const { items: notifications } = useCol("notifications");
 
+  const isRead = (n) => (n.readBy || []).includes(profile.uid);
   const list = sid ? notifications.filter((n) => n.studentId === sid) : notifications;
-  const unreadCount = list.filter((n) => !n.read).length;
+  const unreadCount = list.filter((n) => !isRead(n)).length;
 
-  const markRead = (n) => { if (!n.read) updateItem("notifications", n.id, { read: true }); };
-  const markAllRead = () => list.filter((n) => !n.read).forEach((n) => updateItem("notifications", n.id, { read: true }));
+  const markRead = (n) => { if (!isRead(n)) updateItem("notifications", n.id, { readBy: [...(n.readBy || []), profile.uid] }); };
+  const markAllRead = () => list.filter((n) => !isRead(n)).forEach((n) => updateItem("notifications", n.id, { readBy: [...(n.readBy || []), profile.uid] }));
 
   return (
     <div>
@@ -37,16 +38,17 @@ export default function Notifications() {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {list.map((n) => {
+          const read = isRead(n);
           const Icon = TYPE_ICON[n.type] || Bell;
           const color = TYPE_COLOR[n.type] || T.accent;
           return (
-            <Card key={n.id} onClick={() => markRead(n)} style={{ padding: 14, display: "flex", gap: 12, alignItems: "flex-start", cursor: n.read ? "default" : "pointer", border: n.read ? undefined : `1.5px solid ${color}` }}>
+            <Card key={n.id} onClick={() => markRead(n)} style={{ padding: 14, display: "flex", gap: 12, alignItems: "flex-start", cursor: read ? "default" : "pointer", border: read ? undefined : `1.5px solid ${color}` }}>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: color + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={17} color={color} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ font: `${n.read ? 500 : 700} 14px ${sans}`, color: T.ink }}>{n.text}</div>
+                <div style={{ font: `${read ? 500 : 700} 14px ${sans}`, color: T.ink }}>{n.text}</div>
                 <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 3 }}>{role === "tutor" ? (n.studentName ? n.studentName + " · " : "") : ""}{timeAgo(n.createdAt)}</div>
               </div>
-              {!n.read && <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 5 }} />}
+              {!read && <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 5 }} />}
               {role === "tutor" && <button onClick={(e) => { e.stopPropagation(); removeItem("notifications", n.id); }} style={{ background: "none", border: "none", cursor: "pointer", color: T.faint }}><Trash2 size={15} /></button>}
             </Card>
           );

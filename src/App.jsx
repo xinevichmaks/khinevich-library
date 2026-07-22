@@ -86,7 +86,7 @@ export default function App() {
   const goTab = (id) => { setTab(id); setNavOpen(false); };
 
   const sidForNotif = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
-  const unreadNotifs = allNotifications.filter((n) => !n.read && (sidForNotif ? n.studentId === sidForNotif : role === "admin" ? true : allUsers.find((u) => u.id === n.studentId)?.tutorId === profile.uid));
+  const unreadNotifs = allNotifications.filter((n) => !(n.readBy || []).includes(profile.uid) && (sidForNotif ? n.studentId === sidForNotif : role === "admin" ? true : allUsers.find((u) => u.id === n.studentId)?.tutorId === profile.uid));
   const NOTIF_TYPE_TO_NAV = { new_homework: "homework", homework_done: "homework", homework_checked: "homework", new_grade: "grades", new_note: "notes" };
   const navBadge = (id) => id === "notifications" ? unreadNotifs.length : unreadNotifs.filter((n) => NOTIF_TYPE_TO_NAV[n.type] === id).length;
 
