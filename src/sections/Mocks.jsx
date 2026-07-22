@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Plus, Trash2, ListChecks, Check, X, Eye, Search, Settings2, Tag, Edit3 } from "lucide-react";
+import { Plus, Trash2, ListChecks, Check, X, Eye, Search, Settings2, Tag, Edit3, Repeat } from "lucide-react";
 import { Card, Modal, T, sans, btn, btnGhost, iconBtn, input, chip, TAG_PALETTE } from "../ui.jsx";
 import { DatePicker, fmtDateRu } from "../calendar.jsx";
 import { useAuth } from "../auth.jsx";
-import { useCol, addItem, updateItem, removeItem } from "../useDB.js";
+import { useCol, addItem, updateItem, removeItem, notify } from "../useDB.js";
 
 const LETTERS = "АБВГДЕЖЗИК";
 const QTYPES = [
@@ -57,6 +57,9 @@ export default function Mocks() {
   const [review, setReview] = useState(null);
   const [grading, setGrading] = useState(null);
   const [gradeInputs, setGradeInputs] = useState({});
+  const [reassigning, setReassigning] = useState(null);
+  const [reassignIds, setReassignIds] = useState(new Set());
+  const [reassignDue, setReassignDue] = useState("");
 
   const toggleTarget = (id) => setTargetIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const addQ = () => setQs([...qs, blankQuestion("single")]);
@@ -131,6 +134,7 @@ export default function Mocks() {
     await updateItem("mocks", taking.id, {
       answers: finalAnswers, autoScore: earned, autoTotal: total, score: earned, total,
       manualScores: taking.manualScores || {}, status: hasGraph ? "Требует проверки" : "Пройден",
+      ...(hasGraph ? {} : { date: null }),
     });
     setTaking(null); setAnswers({});
   };
@@ -146,14 +150,27 @@ export default function Mocks() {
       graphEarned += v; graphTotal += q.maxPoints;
     });
     await updateItem("mocks", grading.id, {
-      manualScores, score: (grading.autoScore || 0) + graphEarned, total: (grading.autoTotal || 0) + graphTotal, status: "Пройден",
+      manualScores, score: (grading.autoScore || 0) + graphEarned, total: (grading.autoTotal || 0) + graphTotal, status: "Пройден", date: null,
     });
     setGrading(null); setGradeInputs({});
   };
 
+  const doReassign = async () => {
+    if (!reassigning || reassignIds.size === 0) return;
+    const { id, createdAt, studentId, studentName, status, score, total, autoScore, autoTotal, answers: ansOld, manualScores, date, ...rest } = reassigning;
+    await Promise.all([...reassignIds].map(async (sid2) => {
+      const st = users.find((u) => u.id === sid2);
+      await addItem("mocks", { ...rest, date: reassignDue || null, studentId: sid2, studentName: st?.name || "", tutorId: profile.uid, status: "Ожидает" });
+      await notify(sid2, st?.name || "", `Новый пробник: «${reassigning.title}»`, "new_homework");
+    }));
+    setReassigning(null); setReassignIds(new Set()); setReassignDue("");
+  };
+  const toggleReassign = (id) => setReassignIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+
   return (
     <div>
-      {role === "tutor" && <div style={{ marginBottom: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+      {isStaff && <div style={{ marginBottom: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button style={btn} onClick={() => { setEditingMock(null); setForm({ title: "", subject: "", date: "" }); setQs([]); setAdd(true); }}><Plus size={16} />Добавить пробник</button>
         <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
       </div>}
@@ -179,8 +196,8 @@ export default function Mocks() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {list.map((m) => {
+      {(() => {
+        const renderCard = (m) => {
           const answered = Array.isArray(m.answers);
           const needsReview = m.status === "Требует проверки";
           const statusBg = m.status === "Пройден" ? "#cfe0cf" : needsReview ? "#f0d9a6" : T.line;
@@ -201,21 +218,55 @@ export default function Mocks() {
                   ))}
                 </div>
               )}
-              {role === "tutor" && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{m.studentName}</div>}
-              <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>дата: {fmtDateRu(m.date) || "—"}</div>
+              {isStaff && <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 2 }}>{m.studentName}</div>}
+              <div style={{ font: `12px ${sans}`, color: T.faint, marginTop: 6 }}>{m.date ? `дата: ${fmtDateRu(m.date)}` : "без даты (архив)"}</div>
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 {role === "student" && !answered && <button style={btn} onClick={() => { setTaking(m); setAnswers({}); }}>Пройти пробник</button>}
                 {answered && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => setReview(m)}><ListChecks size={15} />Разбор ответов</button>}
-                {role === "tutor" && needsReview && <button style={btn} onClick={() => { setGrading(m); setGradeInputs(m.manualScores || {}); }}>✍️ Проверить вручную</button>}
-                {role === "tutor" && <button title="Просмотреть и редактировать" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => openEditMock(m)}><Edit3 size={15} />Редактировать</button>}
-                {role === "tutor" && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(m)}><Tag size={15} /></button>}
-                {role === "tutor" && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("mocks", m.id)}><Trash2 size={15} /></button>}
+                {isStaff && needsReview && <button style={btn} onClick={() => { setGrading(m); setGradeInputs(m.manualScores || {}); }}>✍️ Проверить вручную</button>}
+                {isStaff && <button title="Просмотреть и редактировать" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => openEditMock(m)}><Edit3 size={15} />Редактировать</button>}
+                {isStaff && <button title="Задать ещё раз или другим ученикам" style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => { setReassigning(m); setReassignIds(new Set([m.studentId])); setReassignDue(""); }}><Repeat size={15} />Задать ещё</button>}
+                {isStaff && <button title="Теги" style={{ ...iconBtn, border: `1px solid ${T.line}` }} onClick={() => setTagging(m)}><Tag size={15} /></button>}
+                {isStaff && <button style={{ ...btnGhost, padding: "8px 11px" }} onClick={() => removeItem("mocks", m.id)}><Trash2 size={15} /></button>}
               </div>
             </Card>
           );
-        })}
-        {list.length === 0 && <div style={{ color: T.faint, font: `14px ${sans}`, padding: 24 }}>Пробников пока нет.</div>}
-      </div>
+        };
+
+        const needsReview = list.filter((m) => m.status === "Требует проверки");
+        const archived = list.filter((m) => m.status === "Пройден");
+        const active = list.filter((m) => m.status !== "Требует проверки" && m.status !== "Пройден");
+
+        const Section = ({ title, items, empty }) => items.length === 0 && !empty ? null : (
+          <div style={{ marginBottom: 26 }}>
+            <div style={{ font: `600 13px ${sans}`, color: T.faint, textTransform: "uppercase", letterSpacing: ".03em", marginBottom: 10 }}>{title} {items.length > 0 && `(${items.length})`}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {items.length > 0 ? items.map(renderCard) : <div style={{ color: T.faint, font: `14px ${sans}`, padding: 16 }}>Пусто.</div>}
+            </div>
+          </div>
+        );
+
+        if (!isStaff) {
+          const activeStudent = list.filter((m) => m.status !== "Пройден");
+          const archivedStudent = list.filter((m) => m.status === "Пройден");
+          return (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: activeStudent.length ? 0 : 20 }}>
+                {activeStudent.length > 0 ? activeStudent.map(renderCard) : <div style={{ color: T.faint, font: `14px ${sans}`, padding: 24 }}>Активных пробников нет.</div>}
+              </div>
+              {archivedStudent.length > 0 && <Section title="Архив (пройденные)" items={archivedStudent} empty />}
+            </>
+          );
+        }
+
+        return (
+          <>
+            <Section title="Требуют проверки" items={needsReview} empty={list.length === 0} />
+            <Section title="Активные" items={active} empty={list.length === 0} />
+            <Section title="Архив (пройденные)" items={archived} empty={list.length === 0} />
+          </>
+        );
+      })()}
 
       {/* ---------- создание пробника ---------- */}
       <Modal open={add} onClose={() => { setAdd(false); setEditingMock(null); }} title={editingMock ? `Редактировать: ${editingMock.title}` : "Новый пробник"} wide>
@@ -400,7 +451,7 @@ export default function Mocks() {
       <Modal open={!!review} onClose={() => setReview(null)} title="Разбор пробника" wide>
         {review && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ font: `15px ${sans}`, color: T.soft }}>Результат: <b style={{ color: T.ink }}>{review.score}/{review.total}</b>{role === "tutor" ? ` · ${review.studentName}` : ""}</div>
+            <div style={{ font: `15px ${sans}`, color: T.soft }}>Результат: <b style={{ color: T.ink }}>{review.score}/{review.total}</b>{isStaff ? ` · ${review.studentName}` : ""}</div>
             {review.questions.map((qq, i) => {
               const type = qq.type || "single";
               const given = review.answers[i];
@@ -468,6 +519,31 @@ export default function Mocks() {
               );
             })}
             <button style={btn} onClick={saveGrades}>Сохранить баллы</button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ---------- задать ещё раз / другим ученикам ---------- */}
+      <Modal open={!!reassigning} onClose={() => setReassigning(null)} title={reassigning ? `Задать ещё: «${reassigning.title}»` : ""}>
+        {reassigning && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>Выберите, кому назначить этот пробник заново — можно тому же ученику (повторить попытку) и/или другим. Будет создана новая копия со статусом «Ожидает», старая история сохранится.</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {students.map((s) => {
+                const on = reassignIds.has(s.id);
+                const isOriginal = s.id === reassigning.studentId;
+                return (
+                  <button key={s.id} onClick={() => toggleReassign(s.id)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? T.accent : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>
+                    {s.name}{isOriginal ? " (уже был назначен)" : ""}
+                  </button>
+                );
+              })}
+            </div>
+            <div>
+              <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 6 }}>Новая дата</div>
+              <DatePicker value={reassignDue} onChange={setReassignDue} />
+            </div>
+            <button style={btn} onClick={doReassign}>Назначить выбранным ({reassignIds.size})</button>
           </div>
         )}
       </Modal>
