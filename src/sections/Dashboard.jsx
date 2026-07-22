@@ -133,14 +133,16 @@ export default function Dashboard({ go }) {
         </Card>
       )}
 
-      <Card style={{ padding: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-          <div style={{ font: `600 16px ${sans}` }}>Динамика баллов</div>
-          <div style={{ font: `13px ${sans}`, color: T.faint }}>средний балл: <b style={{ color: T.ink }}>{avgScore == null ? "—" : avgScore + "%"}</b></div>
-        </div>
-        <CandleChart rows={gradeRows} />
-        <div style={{ font: `11.5px ${sans}`, color: T.faint, marginTop: 6 }}>зелёная свеча — балл вырос к предыдущему, красная — снизился · шкала: 5→100%, 4→80%, 3→60%, 2→40%, либо балл из максимума</div>
-      </Card>
+      {role !== "tutor" && role !== "admin" && (
+        <Card style={{ padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+            <div style={{ font: `600 16px ${sans}` }}>Динамика баллов</div>
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>средний балл: <b style={{ color: T.ink }}>{avgScore == null ? "—" : avgScore + "%"}</b></div>
+          </div>
+          <CandleChart rows={gradeRows} />
+          <div style={{ font: `11.5px ${sans}`, color: T.faint, marginTop: 6 }}>зелёная свеча — балл вырос к предыдущему, красная — снизился · шкала: 5→100%, 4→80%, 3→60%, 2→40%, либо балл из максимума</div>
+        </Card>
+      )}
 
       {role !== "tutor" && role !== "admin" && (
         <WeakTopics sid={sid} homework={scoped(homework)} mocks={scoped(mocks)} tutorView={role === "tutor"} />
