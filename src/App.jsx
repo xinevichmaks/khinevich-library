@@ -114,14 +114,7 @@ export default function App() {
             );
           })}
         </nav>
-        {canSwitchSelfRole && !isImpersonating && (
-          <div style={{ display: "flex", gap: 4, padding: 4, background: "rgba(0,0,0,.2)", borderRadius: 9, marginTop: 10 }}>
-            {["admin", "tutor"].map((r) => (
-              <button key={r} onClick={() => setSelfRoleView(r)} style={{ flex: 1, padding: "7px 4px", borderRadius: 6, border: "none", cursor: "pointer", background: role === r ? "#fff" : "transparent", color: role === r ? T.accent : "rgba(255,255,255,.75)", font: `600 12px ${sans}` }}>{ROLE_LABEL[r]}</button>
-            ))}
-          </div>
-        )}
-        <div style={{ marginTop: canSwitchSelfRole ? 12 : "auto", paddingTop: 12, borderTop: `1px solid ${T.sidebarLine}`, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginTop: "auto", paddingTop: 12, borderTop: `1px solid ${T.sidebarLine}`, display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar text={initials(profile.name)} size={34} bg="#fff" color="#111" />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ font: `600 13px ${sans}`, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</div>
@@ -129,6 +122,13 @@ export default function App() {
           </div>
           <button onClick={logout} title="Выйти" style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,.7)" }}><LogOut size={17} /></button>
         </div>
+        {canSwitchSelfRole && !isImpersonating && (
+          <div style={{ display: "flex", gap: 4, padding: 4, background: "rgba(0,0,0,.2)", borderRadius: 9, marginTop: 10 }}>
+            {["admin", "tutor"].map((r) => (
+              <button key={r} onClick={() => setSelfRoleView(r)} style={{ flex: 1, padding: "7px 4px", borderRadius: 6, border: "none", cursor: "pointer", background: role === r ? "#fff" : "transparent", color: role === r ? T.accent : "rgba(255,255,255,.75)", font: `600 12px ${sans}` }}>{ROLE_LABEL[r]}</button>
+            ))}
+          </div>
+        )}
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
