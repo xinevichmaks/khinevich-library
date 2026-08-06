@@ -63,21 +63,28 @@ export default function Homework() {
   const updQ = (i, patch) => setQs(qs.map((q, idx) => (idx === i ? { ...q, ...patch } : q)));
   const updOpt = (i, j, v) => setQs(qs.map((q, idx) => (idx === i ? { ...q, opts: q.opts.map((o, oi) => (oi === j ? v : o)) } : q)));
 
+  const [saveError, setSaveError] = useState("");
   const save = async () => {
-    if (!form.title) return;
+    setSaveError("");
+    if (!form.title) { setSaveError("Введите название задания."); return; }
     const cleanQs = qs.filter((q) => q.q.trim());
-    if (editingHw) {
-      await updateItem("homework", editingHw.id, { ...form, ...(cleanQs.length ? { questions: cleanQs } : {}) });
-      setEditingHw(null); setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]);
-      return;
+    try {
+      if (editingHw) {
+        await updateItem("homework", editingHw.id, { ...form, ...(cleanQs.length ? { questions: cleanQs } : {}) });
+        setEditingHw(null); setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]);
+        return;
+      }
+      if (targetIds.size === 0) { setSaveError("Выберите хотя бы одного ученика."); return; }
+      await Promise.all([...targetIds].map(async (studentId) => {
+        const st = users.find((u) => u.id === studentId);
+        await addItem("homework", { ...form, studentId, studentName: st?.name || "", tutorId: profile.uid, status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
+        try { await notify(studentId, st?.name || "", `Новое домашнее задание: «${form.title}»`, "new_homework"); } catch (e) { console.error("notify failed", e); }
+      }));
+      setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]); setTargetIds(new Set());
+    } catch (e) {
+      console.error("save homework failed", e);
+      setSaveError("Не получилось сохранить: " + (e.message || e));
     }
-    if (targetIds.size === 0) return;
-    await Promise.all([...targetIds].map(async (studentId) => {
-      const st = users.find((u) => u.id === studentId);
-      await addItem("homework", { ...form, studentId, studentName: st?.name || "", tutorId: profile.uid, status: "Выдана", ...(cleanQs.length ? { questions: cleanQs } : {}) });
-      await notify(studentId, st?.name || "", `Новое домашнее задание: «${form.title}»`, "new_homework");
-    }));
-    setAdd(false); setForm({ title: "", desc: "", due: "", materialId: "", tagIds: [] }); setQs([]); setTargetIds(new Set());
   };
 
   const openEdit = (h) => {
@@ -338,6 +345,7 @@ export default function Homework() {
             <button style={btnGhost} onClick={addQ}><Plus size={15} />Добавить вопрос</button>
           </div>
 
+          {saveError && <div style={{ font: `13px ${sans}`, color: "#a23b2d" }}>{saveError}</div>}
           <button style={btn} onClick={save}>{editingHw ? "Сохранить изменения" : "Выдать"}</button>
         </div>
       </Modal>
