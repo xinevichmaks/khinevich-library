@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
-import { CalendarDays, Wallet, BookOpen, Award, ChevronRight, PencilLine } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, Wallet, BookOpen, Award, ChevronRight, PencilLine, AlertTriangle, X } from "lucide-react";
 import { Card, T, serif, sans, chip } from "../ui.jsx";
 import { MonthCalendar } from "../calendar.jsx";
 import { CandleChart } from "../chart.jsx";
 import { useAuth } from "../auth.jsx";
-import { useCol } from "../useDB.js";
+import { useCol, updateItem } from "../useDB.js";
 import { scoreFraction, averagePct, computeWeakTopics } from "../grading.js";
+import { fmtDateRu } from "../calendar.jsx";
 
 function Stat({ label, val, Icon, sub }) {
   return (
@@ -85,6 +86,24 @@ export default function Dashboard({ go }) {
   const mockDays = scoped(mocks).map((m) => m.date).filter(Boolean);
 
   const now = new Date();
+  const todayISO = now.toISOString().slice(0, 10);
+
+  // Просроченные ДЗ — статус «Выдана», срок прошёл. Автоматически помечаем «Не выполнена».
+  const overdueHw = useMemo(() => scoped(homework)
+    .filter((h) => h.status === "Не выполнена" || (h.status === "Выдана" && h.due && h.due < todayISO))
+    .sort((a, b) => (a.due || "").localeCompare(b.due || "")), [homework, sid, todayISO]);
+
+  useEffect(() => {
+    homework.forEach((h) => {
+      if (h.status === "Выдана" && h.due && h.due < todayISO) {
+        updateItem("homework", h.id, { status: "Не выполнена" });
+      }
+    });
+  }, [homework, todayISO]);
+
+  const notYetDone = overdueHw.length;
+
+  const [showOverdueToast, setShowOverdueToast] = useState(true);
 
   // прогноз даты новой оплаты — для родителя
   const paidPrediction = useMemo(() => {
@@ -105,15 +124,57 @@ export default function Dashboard({ go }) {
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         {role === "tutor" && <>
           <Stat label="Занятий" val={scoped(schedule).length} Icon={CalendarDays} />
-          <Stat label="Домашек выдано" val={scoped(homework).length} Icon={BookOpen} sub={`${scoped(homework).filter((h) => h.status !== "Выдана").length} сданы`} />
+          <Stat label="Домашек выдано" val={scoped(homework).length} Icon={BookOpen} sub={
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ ...chip, background: "#cfe0cf" }}>{scoped(homework).filter((h) => h.status !== "Выдана" && h.status !== "Не выполнена").length} сданы</span>
+              {notYetDone > 0 && <span style={{ ...chip, background: "#e7c6c1" }}>{notYetDone} не выполнено</span>}
+            </div>
+          } />
           <Stat label="Пробников" val={scoped(mocks).length} Icon={PencilLine} sub={`${scoped(mocks).filter((m) => m.status === "Пройден").length} пройдено`} />
         </>}
         {role !== "tutor" && <>
           <Stat label="Занятий проведено" val={doneLessons} Icon={Wallet} sub={myProfile?.paidLessons ? `из ${myProfile.paidLessons} оплаченных` : undefined} />
-          <Stat label="Домашек" val={myHw.length} Icon={BookOpen} sub={`${myHw.filter((h) => h.status !== "Выдана").length} выполнено`} />
+          <Stat label="Домашек" val={myHw.length} Icon={BookOpen} sub={
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ ...chip, background: "#cfe0cf" }}>{myHw.filter((h) => h.status !== "Выдана" && h.status !== "Не выполнена").length} выполнено</span>
+              {notYetDone > 0 && <span style={{ ...chip, background: "#e7c6c1" }}>{notYetDone} не выполнено</span>}
+            </div>
+          } />
           <Stat label="Пробников" val={scoped(mocks).length} Icon={PencilLine} sub={`${scoped(mocks).filter((m) => m.status === "Пройден").length} пройдено`} />
         </>}
       </div>
+
+      {overdueHw.length > 0 && showOverdueToast && (
+        <div style={{ position: "fixed", top: 20, right: 20, width: 320, background: T.card, border: `1px solid #e7c6c1`, borderRadius: 12, padding: "14px 16px", display: "flex", gap: 10, alignItems: "flex-start", boxShadow: "0 12px 32px rgba(0,0,0,.18)", zIndex: 100 }}>
+          <AlertTriangle size={20} color="#a23b2d" style={{ marginTop: 2, flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ font: `600 14px ${sans}`, color: T.ink, marginBottom: 2 }}>Дедлайн истёк</div>
+            <div style={{ font: `13px ${sans}`, color: T.faint }}>
+              «{overdueHw[0].title}»{role === "tutor" || role === "admin" ? ` — ${overdueHw[0].studentName}` : ""} не сдано до {fmtDateRu(overdueHw[0].due)}.{overdueHw.length > 1 ? ` И ещё ${overdueHw.length - 1}.` : ""}
+            </div>
+          </div>
+          <button onClick={() => setShowOverdueToast(false)} style={{ background: "none", border: "none", color: T.faint, cursor: "pointer", padding: 2 }}><X size={16} /></button>
+        </div>
+      )}
+
+      {overdueHw.length > 0 && (
+        <Card style={{ padding: 18 }}>
+          <div style={{ font: `600 15px ${sans}`, color: T.ink, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><AlertTriangle size={16} color="#a23b2d" />Просроченные задания</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {overdueHw.map((h) => (
+              <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 12, background: T.cardAlt, borderLeft: "3px solid #a23b2d", borderRadius: "0 8px 8px 0", padding: "10px 14px" }}>
+                <AlertTriangle size={16} color="#a23b2d" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ font: `600 13.5px ${sans}`, color: T.ink }}>{h.title}</div>
+                  <div style={{ font: `12px ${sans}`, color: T.faint }}>{(role === "tutor" || role === "admin") ? `${h.studentName} · ` : ""}срок был {fmtDateRu(h.due)}</div>
+                </div>
+                <span style={{ ...chip, background: "#e7c6c1" }}>Не выполнена</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => go("homework")} style={{ marginTop: 10, font: `600 13px ${sans}`, color: T.accent, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3, padding: 0 }}>Открыть Домашку <ChevronRight size={14} /></button>
+        </Card>
+      )}
 
       {role !== "tutor" && role !== "admin" && (
         <Card style={{ padding: 18 }}>
