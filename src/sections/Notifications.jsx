@@ -22,9 +22,14 @@ export default function Notifications() {
   const { profile, role } = useAuth();
   const sid = role === "student" ? profile.uid : role === "parent" ? profile.childId : null;
   const { items: notifications } = useCol("notifications");
+  const { items: users } = useCol("users");
 
   const isRead = (n) => (n.readBy || []).includes(profile.uid);
-  const list = sid ? notifications.filter((n) => n.studentId === sid) : notifications;
+  const list = sid
+    ? notifications.filter((n) => n.studentId === sid)
+    : role === "admin"
+      ? notifications
+      : notifications.filter((n) => users.find((u) => u.id === n.studentId)?.tutorId === profile.uid);
   const unreadCount = list.filter((n) => !isRead(n)).length;
 
   const markRead = (n) => { if (!isRead(n)) updateItem("notifications", n.id, { readBy: [...(n.readBy || []), profile.uid] }); };
