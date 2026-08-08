@@ -4,12 +4,13 @@ import {
   CalendarDays, Calendar as CalendarIcon, Award, PencilLine, Menu, X, Bell,
   GraduationCap, User, Users, LogOut, ChevronRight, ShieldCheck,
 } from "lucide-react";
-import { Settings, UserCog, StickyNote, KeyRound } from "lucide-react";
+import { Settings, UserCog, StickyNote, KeyRound, TrendingDown } from "lucide-react";
 import { T, serif, sans, Card, Avatar, btn, input, ROLE_LABEL, initials, SUBJECTS } from "./ui.jsx";
 import { useAuth } from "./auth.jsx";
 import { useCol, setUserDoc } from "./useDB.js";
 
 import Dashboard from "./sections/Dashboard.jsx";
+import WeakSpots from "./sections/WeakSpots.jsx";
 import Students from "./sections/Students.jsx";
 import Tutors from "./sections/Tutors.jsx";
 import Library from "./sections/Library.jsx";
@@ -36,6 +37,7 @@ const NAV = [
   { id: "notifications", label: "Уведомления", Icon: Bell, roles: ["tutor", "admin", "student", "parent"] },
   { id: "mocks", label: "Пробники", Icon: PencilLine, roles: ["tutor", "admin", "student", "parent"] },
   { id: "grades", label: "Журнал оценок", Icon: Award, roles: ["tutor", "admin", "student", "parent"] },
+  { id: "weakspots", label: "Слабые места", Icon: TrendingDown, roles: ["tutor", "admin", "student", "parent"] },
   { id: "students", label: "Ученики", Icon: Users, roles: ["tutor", "admin"] },
   { id: "tutors", label: "Репетиторы", Icon: ShieldCheck, roles: ["admin"] },
   { id: "profiles", label: "Профили", Icon: UserCog, roles: ["admin"] },
@@ -157,6 +159,7 @@ export default function App() {
           {current === "notifications" && <Notifications />}
           {current === "mocks" && <Mocks />}
           {current === "grades" && <Grades />}
+          {current === "weakspots" && <WeakSpots />}
           {current === "settings" && <SettingsPage />}
           {current === "notes" && <Notes />}
           {current === "accounts" && <Accounts />}
