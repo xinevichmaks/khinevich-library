@@ -49,7 +49,7 @@ export default function Mocks() {
   const [add, setAdd] = useState(false);
   const [editingMock, setEditingMock] = useState(null);
   const [targetIds, setTargetIds] = useState(new Set());
-  const [form, setForm] = useState({ title: "", subject: "", date: "" });
+  const [form, setForm] = useState({ title: "", subject: "", date: "", tagIds: [] });
   const [qs, setQs] = useState([]);
 
   const [taking, setTaking] = useState(null);
@@ -88,7 +88,7 @@ export default function Mocks() {
     const cleanQs = qs.filter((q) => q.q.trim());
     if (editingMock) {
       await updateItem("mocks", editingMock.id, { ...form, ...(cleanQs.length ? { questions: JSON.parse(JSON.stringify(cleanQs)) } : {}) });
-      setEditingMock(null); setAdd(false); setForm({ title: "", subject: "", date: "" }); setQs([]);
+      setEditingMock(null); setAdd(false); setForm({ title: "", subject: "", date: "", tagIds: [] }); setQs([]);
       return;
     }
     if (targetIds.size === 0) return;
@@ -96,12 +96,12 @@ export default function Mocks() {
       const st = users.find((u) => u.id === studentId);
       return addItem("mocks", { ...form, studentId, studentName: st?.name || "", tutorId: profile.uid, status: "Ожидает", questions: JSON.parse(JSON.stringify(cleanQs)) });
     }));
-    setAdd(false); setForm({ title: "", subject: "", date: "" }); setQs([]); setTargetIds(new Set());
+    setAdd(false); setForm({ title: "", subject: "", date: "", tagIds: [] }); setQs([]); setTargetIds(new Set());
   };
 
   const openEditMock = (m) => {
     setEditingMock(m);
-    setForm({ title: m.title, subject: m.subject || "", date: m.date || "" });
+    setForm({ title: m.title, subject: m.subject || "", date: m.date || "", tagIds: m.tagIds || [] });
     setQs(m.questions || []);
     setAdd(true);
   };
@@ -172,7 +172,7 @@ export default function Mocks() {
   return (
     <div>
       {isStaff && <div style={{ marginBottom: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button style={btn} onClick={() => { setEditingMock(null); setForm({ title: "", subject: "", date: "" }); setQs([]); setAdd(true); }}><Plus size={16} />Добавить пробник</button>
+        <button style={btn} onClick={() => { setEditingMock(null); setForm({ title: "", subject: "", date: "", tagIds: [] }); setQs([]); setAdd(true); }}><Plus size={16} />Добавить пробник</button>
         <button style={btnGhost} onClick={() => setTagManager(true)}><Settings2 size={16} />Теги</button>
       </div>}
 
@@ -289,6 +289,21 @@ export default function Mocks() {
           <div style={{ display: "flex", gap: 10 }}>
             <input style={input} placeholder="Предмет" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
             <DatePicker value={form.date} onChange={(d) => setForm({ ...form, date: d })} />
+          </div>
+          <div>
+            <div style={{ font: `12px ${sans}`, color: T.faint, marginBottom: 8 }}>Теги</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {tags.map((t) => {
+                const on = form.tagIds.includes(t.id);
+                return (
+                  <button key={t.id} type="button" onClick={() => setForm({ ...form, tagIds: on ? form.tagIds.filter((x) => x !== t.id) : [...form.tagIds, t.id] })}
+                    style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${on ? t.color : T.line}`, background: on ? T.accentSoft : T.cardAlt, font: `600 12.5px ${sans}`, color: T.ink, cursor: "pointer" }}>
+                    <span style={{ width: 9, height: 9, borderRadius: "50%", background: t.color }} />{t.name}
+                  </button>
+                );
+              })}
+              {tags.length === 0 && <div style={{ font: `12.5px ${sans}`, color: T.faint }}>Тегов пока нет — создайте через кнопку «Теги» в шапке списка.</div>}
+            </div>
           </div>
 
           <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>
